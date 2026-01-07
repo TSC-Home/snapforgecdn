@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm add:*)",
+      "Bash(pnpm approve-builds:*)",
+      "Bash(pnpm rebuild:*)",
+      "Bash(pnpm remove:*)",
+      "WebFetch(domain:chat-ms.louist.de)",
+      "Bash(pnpm check:*)",
+      "Skill(frontend-design)"
+    ]
+  }
+}
