@@ -54,13 +54,37 @@ export async function createGallery(userId: string, name: string): Promise<{ suc
 }
 
 export async function getGallery(galleryId: string, userId: string): Promise<schema.Gallery | null> {
+	// First get the gallery
 	const gallery = await db
 		.select()
 		.from(schema.galleries)
-		.where(and(eq(schema.galleries.id, galleryId), eq(schema.galleries.userId, userId)))
+		.where(eq(schema.galleries.id, galleryId))
 		.get();
 
-	return gallery ?? null;
+	if (!gallery) return null;
+
+	// Check if user is owner
+	if (gallery.userId === userId) {
+		return gallery;
+	}
+
+	// Check if user is collaborator
+	const collaborator = await db
+		.select()
+		.from(schema.galleryCollaborators)
+		.where(
+			and(
+				eq(schema.galleryCollaborators.galleryId, galleryId),
+				eq(schema.galleryCollaborators.userId, userId)
+			)
+		)
+		.get();
+
+	if (collaborator) {
+		return gallery;
+	}
+
+	return null;
 }
 
 export async function getGalleryByToken(accessToken: string): Promise<schema.Gallery | null> {

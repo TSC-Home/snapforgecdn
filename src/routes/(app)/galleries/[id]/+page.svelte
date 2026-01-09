@@ -12,6 +12,7 @@
 	let uploadOpen = $state(false);
 	let selectedImage = $state<Image | null>(null);
 	let imageDetailTab = $state<'info' | 'tags' | 'location'>('info');
+	let apiDocsTab = $state<'upload' | 'images' | 'manage' | 'tags'>('upload');
 
 	// Image metadata editing (inline in detail view)
 	let editingTags = $state<string[]>([]);
@@ -348,13 +349,13 @@
 	<title>{data.gallery.name} - SnapForgeCDN</title>
 </svelte:head>
 
-<div class="space-y-6">
+<div class="space-y-5">
 	<!-- Header -->
 	<div class="flex items-start justify-between">
 		<div>
-			<a href="/galleries" class="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 transition-colors mb-2">
+			<a href="/galleries" class="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors mb-2">
 				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19l-7-7 7-7" />
 				</svg>
 				Galleries
 			</a>
@@ -366,72 +367,30 @@
 			</div>
 		</div>
 		<div class="flex items-center gap-2">
-			<Button onclick={() => uploadOpen = !uploadOpen} class={uploadOpen ? 'ring-2 ring-gray-900 ring-offset-2' : ''}>
-				<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+			<!-- Upload Button -->
+			<button
+				type="button"
+				onclick={() => uploadOpen = true}
+				class="group inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl bg-gray-900 text-white hover:bg-gray-800 shadow-sm hover:shadow-md active:scale-[0.98] transition-all duration-200"
+			>
+				<svg class="w-4 h-4 transition-transform group-hover:-translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m0-16l-4 4m4-4l4 4" />
 				</svg>
 				Upload
-			</Button>
+			</button>
+			<!-- Settings -->
 			<a
 				href="/galleries/{data.gallery.id}/settings"
-				class="inline-flex items-center justify-center p-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md shadow-sm hover:bg-gray-50 transition-colors"
+				class="group inline-flex items-center justify-center w-10 h-10 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100/80 hover:shadow-sm active:scale-95 transition-all duration-200"
+				title="Gallery settings"
 			>
-				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+				<svg class="w-5 h-5 transition-transform duration-300 group-hover:rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
 				</svg>
 			</a>
 		</div>
 	</div>
-
-	<!-- Upload Zone (Expandable like SMTP settings) -->
-	{#if uploadOpen}
-		<div class="animate-in border border-gray-200 bg-white rounded-lg overflow-hidden">
-			<div class="p-4 bg-gray-50 border-b border-gray-200">
-				<div class="flex items-center justify-between">
-					<div class="flex items-center gap-2">
-						<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-						</svg>
-						<span class="text-sm font-medium text-gray-700">Upload Images</span>
-					</div>
-					<button type="button" onclick={() => uploadOpen = false} class="p-1 text-gray-400 hover:text-gray-600 transition-colors">
-						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-						</svg>
-					</button>
-				</div>
-			</div>
-			<div class="p-4">
-				{#if uploading}
-					<div class="flex items-center gap-4">
-						<div class="w-10 h-10 flex items-center justify-center border border-gray-200 bg-gray-50 rounded">
-							<svg class="w-5 h-5 text-gray-500 animate-spin" fill="none" viewBox="0 0 24 24">
-								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-							</svg>
-						</div>
-						<div class="flex-1 min-w-0">
-							<div class="flex items-center justify-between mb-1.5">
-								<p class="text-sm font-medium text-gray-900">
-									{uploadProgress.status === 'processing' ? 'Processing' : 'Uploading'} · <span class="font-normal text-gray-500 truncate">{uploadProgress.currentFile}</span>
-								</p>
-								<span class="text-xs tabular-nums text-gray-400 ml-2">{uploadProgress.current + 1}/{uploadProgress.total}</span>
-							</div>
-							<div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-								<div
-									class="h-full rounded-full transition-all duration-300 {uploadProgress.status === 'processing' ? 'bg-amber-500' : 'bg-gray-900'}"
-									style="width: {((uploadProgress.current + (uploadProgress.status === 'processing' ? 0.5 : 0)) / uploadProgress.total) * 100}%"
-								></div>
-							</div>
-						</div>
-					</div>
-				{:else}
-					<Upload onfiles={handleFilesSelected} disabled={uploading} />
-				{/if}
-			</div>
-		</div>
-	{/if}
 
 	<!-- Toolbar -->
 	<div class="flex items-center justify-between">
@@ -830,6 +789,95 @@
 	</div>
 {/if}
 
+<!-- Upload Modal -->
+{#if uploadOpen}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4"
+		onkeydown={(e) => e.key === 'Escape' && !uploading && (uploadOpen = false)}
+		role="presentation"
+	>
+		<!-- Backdrop with blur -->
+		<button
+			type="button"
+			class="absolute inset-0 bg-gray-900/40 backdrop-blur-md transition-opacity"
+			onclick={() => !uploading && (uploadOpen = false)}
+			disabled={uploading}
+			aria-label="Close"
+		></button>
+
+		<!-- Modal Panel -->
+		<div class="relative w-full max-w-lg bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200/50 overflow-hidden animate-modal-in">
+			<!-- Header -->
+			<div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+				<div class="flex items-center gap-3">
+					<div class="w-10 h-10 rounded-xl bg-gray-900 flex items-center justify-center">
+						<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+						</svg>
+					</div>
+					<div>
+						<h2 class="text-lg font-semibold text-gray-900">Upload Images</h2>
+						<p class="text-xs text-gray-500">Drag & drop or click to select</p>
+					</div>
+				</div>
+				{#if !uploading}
+					<button
+						type="button"
+						onclick={() => uploadOpen = false}
+						class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+					>
+						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+						</svg>
+					</button>
+				{/if}
+			</div>
+
+			<!-- Content -->
+			<div class="p-6">
+				{#if uploading}
+					<!-- Upload Progress -->
+					<div class="space-y-4">
+						<div class="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
+							<div class="w-12 h-12 rounded-xl bg-gray-900 flex items-center justify-center flex-shrink-0">
+								<svg class="w-5 h-5 text-white animate-spin" fill="none" viewBox="0 0 24 24">
+									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+								</svg>
+							</div>
+							<div class="flex-1 min-w-0">
+								<div class="flex items-center justify-between mb-1">
+									<p class="text-sm font-medium text-gray-900">
+										{uploadProgress.status === 'processing' ? 'Processing...' : 'Uploading...'}
+									</p>
+									<span class="text-sm tabular-nums font-semibold text-gray-900">
+										{uploadProgress.current + 1} / {uploadProgress.total}
+									</span>
+								</div>
+								<p class="text-xs text-gray-500 truncate mb-2">{uploadProgress.currentFile}</p>
+								<div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+									<div
+										class="h-full rounded-full transition-all duration-300 {uploadProgress.status === 'processing' ? 'bg-amber-500' : 'bg-gray-900'}"
+										style="width: {((uploadProgress.current + (uploadProgress.status === 'processing' ? 0.5 : 0)) / uploadProgress.total) * 100}%"
+									></div>
+								</div>
+							</div>
+						</div>
+						<p class="text-xs text-center text-gray-400">Please wait while your images are being uploaded...</p>
+					</div>
+				{:else}
+					<!-- Drag & Drop Zone -->
+					<Upload onfiles={handleFilesSelected} disabled={uploading} />
+					<p class="mt-3 text-xs text-center text-gray-400">
+						Supports PNG, JPG, WebP, GIF up to 50MB each
+					</p>
+				{/if}
+			</div>
+		</div>
+	</div>
+{/if}
+
 <!-- Tags Management Modal -->
 <Modal bind:open={tagsModalOpen} title="Manage Tags" size="md">
 	<TagManager
@@ -844,37 +892,263 @@
 </Modal>
 
 <!-- API Documentation Modal -->
-<Modal bind:open={docsOpen} title="API Documentation" size="lg">
-	<div class="space-y-6 text-sm">
-		<div>
-			<h3 class="font-semibold text-gray-900 mb-2">Upload Image</h3>
-			<code class="block p-3 bg-gray-50 border border-gray-200 rounded-lg font-mono text-xs overflow-x-auto">
-POST /api/images/upload<br/>
-Authorization: Bearer {'{token}'}<br/>
-Content-Type: multipart/form-data<br/>
-<br/>
-file: (binary)
-			</code>
-		</div>
-		<div>
-			<h3 class="font-semibold text-gray-900 mb-2">Get Image</h3>
-			<code class="block p-3 bg-gray-50 border border-gray-200 rounded-lg font-mono text-xs">
-GET /i/{'{imageId}'}?thumb&amp;w=800&amp;h=600&amp;q=80
-			</code>
-			<p class="mt-2 text-gray-500">Parameters: <code class="text-gray-700">thumb</code>, <code class="text-gray-700">w</code>, <code class="text-gray-700">h</code>, <code class="text-gray-700">q</code> (quality)</p>
-		</div>
-		<div>
-			<h3 class="font-semibold text-gray-900 mb-2">Delete Image</h3>
-			<code class="block p-3 bg-gray-50 border border-gray-200 rounded-lg font-mono text-xs">
-DELETE /api/images/{'{imageId}'}<br/>
-Authorization: Bearer {'{token}'}
-			</code>
+{#if docsOpen}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4"
+		onkeydown={(e) => e.key === 'Escape' && (docsOpen = false)}
+		role="presentation"
+	>
+		<!-- Backdrop -->
+		<button
+			type="button"
+			class="absolute inset-0 bg-gray-900/40 backdrop-blur-md"
+			onclick={() => docsOpen = false}
+			aria-label="Close"
+		></button>
+
+		<!-- Modal Panel -->
+		<div class="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-gray-200/50 overflow-hidden animate-modal-in flex flex-col" style="max-height: 85vh;">
+			<!-- Header -->
+			<div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+				<div class="flex items-center gap-3">
+					<div class="w-10 h-10 rounded-xl bg-gray-900 flex items-center justify-center">
+						<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+						</svg>
+					</div>
+					<div>
+						<h2 class="text-lg font-semibold text-gray-900">API Reference</h2>
+						<p class="text-xs text-gray-500">RESTful endpoints for {data.gallery.name}</p>
+					</div>
+				</div>
+				<button
+					type="button"
+					onclick={() => docsOpen = false}
+					class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+				>
+					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+					</svg>
+				</button>
+			</div>
+
+			<!-- Auth Banner -->
+			<div class="px-6 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+				<div class="flex items-center gap-2 text-xs">
+					<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+					</svg>
+					<code class="font-mono text-gray-600">Authorization: Bearer {data.gallery.accessToken.slice(0, 12)}...</code>
+				</div>
+				<button
+					type="button"
+					onclick={() => copyToClipboard(`Bearer ${data.gallery.accessToken}`, 'Auth header copied')}
+					class="px-2 py-1 text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded-md transition-colors"
+				>
+					Copy
+				</button>
+			</div>
+
+			<!-- Tabs -->
+			<div class="px-6 border-b border-gray-100 flex-shrink-0">
+				<nav class="flex gap-1 -mb-px">
+					{#each [
+						{ id: 'upload', label: 'Upload', icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12' },
+						{ id: 'images', label: 'Images', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
+						{ id: 'manage', label: 'Manage', icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z' },
+						{ id: 'tags', label: 'Tags', icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z' }
+					] as tab}
+						<button
+							type="button"
+							onclick={() => apiDocsTab = tab.id as typeof apiDocsTab}
+							class="flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-all {apiDocsTab === tab.id ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}"
+						>
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d={tab.icon} />
+							</svg>
+							{tab.label}
+						</button>
+					{/each}
+				</nav>
+			</div>
+
+			<!-- Tab Content -->
+			<div class="flex-1 overflow-y-auto p-6">
+				{#if apiDocsTab === 'upload'}
+					<div class="space-y-4 animate-in">
+						<!-- Upload Endpoint -->
+						<div class="p-4 bg-gray-50 rounded-xl border border-gray-200">
+							<div class="flex items-center justify-between mb-3">
+								<div class="flex items-center gap-2">
+									<span class="px-2 py-0.5 text-xs font-bold rounded bg-emerald-100 text-emerald-700">POST</span>
+									<code class="text-sm font-mono font-medium text-gray-900">/api/images/upload</code>
+								</div>
+								<button
+									type="button"
+									onclick={() => copyToClipboard(`curl -X POST "${data.baseUrl}/api/images/upload" -H "Authorization: Bearer ${data.gallery.accessToken}" -F "file=@image.jpg"`, 'cURL command copied')}
+									class="px-2.5 py-1 text-xs font-medium text-gray-500 hover:text-gray-700 bg-white hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors"
+								>
+									Copy cURL
+								</button>
+							</div>
+							<div class="space-y-3 text-sm">
+								<div>
+									<span class="text-xs font-medium text-gray-500 uppercase">Content-Type</span>
+									<p class="font-mono text-gray-700">multipart/form-data</p>
+								</div>
+								<div class="grid grid-cols-2 gap-3">
+									<div class="p-3 bg-white rounded-lg border border-gray-200">
+										<span class="text-xs font-medium text-gray-400 uppercase">Request Body</span>
+										<ul class="mt-2 space-y-1 text-xs">
+											<li><code class="text-gray-800">file</code> <span class="text-red-500">*</span> - Image file (max 50MB)</li>
+											<li><code class="text-gray-800">tags</code> - Comma-separated tag IDs</li>
+										</ul>
+									</div>
+									<div class="p-3 bg-white rounded-lg border border-gray-200">
+										<span class="text-xs font-medium text-gray-400 uppercase">Response</span>
+										<code class="block mt-2 text-xs font-mono text-gray-600 whitespace-pre">{`{ "id", "url", "thumbnail",
+  "width", "height", "size" }`}</code>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+				{:else if apiDocsTab === 'images'}
+					<div class="space-y-4 animate-in">
+						<!-- CDN URL -->
+						<div class="p-4 bg-gray-50 rounded-xl border border-gray-200">
+							<div class="flex items-center gap-2 mb-3">
+								<span class="px-2 py-0.5 text-xs font-bold rounded bg-blue-100 text-blue-700">GET</span>
+								<code class="text-sm font-mono font-medium text-gray-900">/i/{'{id}'}</code>
+								<span class="ml-auto text-xs text-gray-400">Public CDN</span>
+							</div>
+							<p class="text-xs text-gray-600 mb-3">No authentication required. Cached for 1 year.</p>
+							<div class="grid grid-cols-2 gap-3">
+								<div class="p-3 bg-white rounded-lg border border-gray-200">
+									<span class="text-xs font-medium text-gray-400 uppercase">Parameters</span>
+									<ul class="mt-2 space-y-1 text-xs">
+										<li><code class="text-gray-800">thumb</code> - Thumbnail (~150px)</li>
+										<li><code class="text-gray-800">w</code> - Width in pixels</li>
+										<li><code class="text-gray-800">h</code> - Height in pixels</li>
+										<li><code class="text-gray-800">q</code> - Quality (1-100)</li>
+									</ul>
+								</div>
+								<div class="p-3 bg-white rounded-lg border border-gray-200">
+									<span class="text-xs font-medium text-gray-400 uppercase">Examples</span>
+									<ul class="mt-2 space-y-1 text-xs font-mono text-gray-600">
+										<li>/i/abc?thumb</li>
+										<li>/i/abc?w=800</li>
+										<li>/i/abc?w=400&h=300</li>
+									</ul>
+								</div>
+							</div>
+						</div>
+
+						<!-- List Images -->
+						<div class="p-4 bg-gray-50 rounded-xl border border-gray-200">
+							<div class="flex items-center gap-2 mb-3">
+								<span class="px-2 py-0.5 text-xs font-bold rounded bg-blue-100 text-blue-700">GET</span>
+								<code class="text-sm font-mono font-medium text-gray-900">/api/images</code>
+							</div>
+							<div class="flex items-center gap-2 text-xs text-gray-600">
+								<span class="text-gray-400">Params:</span>
+								<code class="px-1.5 py-0.5 bg-white rounded border border-gray-200">page</code>
+								<code class="px-1.5 py-0.5 bg-white rounded border border-gray-200">perPage</code>
+								<code class="px-1.5 py-0.5 bg-white rounded border border-gray-200">tag</code>
+							</div>
+						</div>
+
+						<!-- Get Single -->
+						<div class="p-4 bg-gray-50 rounded-xl border border-gray-200">
+							<div class="flex items-center gap-2">
+								<span class="px-2 py-0.5 text-xs font-bold rounded bg-blue-100 text-blue-700">GET</span>
+								<code class="text-sm font-mono font-medium text-gray-900">/api/images/{'{id}'}</code>
+								<span class="ml-auto text-xs text-gray-400">Returns image details</span>
+							</div>
+						</div>
+					</div>
+
+				{:else if apiDocsTab === 'manage'}
+					<div class="space-y-4 animate-in">
+						<!-- Update Metadata -->
+						<div class="p-4 bg-gray-50 rounded-xl border border-gray-200">
+							<div class="flex items-center gap-2 mb-3">
+								<span class="px-2 py-0.5 text-xs font-bold rounded bg-amber-100 text-amber-700">PATCH</span>
+								<code class="text-sm font-mono font-medium text-gray-900">/api/images/{'{id}'}/metadata</code>
+							</div>
+							<code class="block p-3 bg-white rounded-lg border border-gray-200 text-xs font-mono text-gray-700 whitespace-pre">{`{
+  "latitude": 52.520008,
+  "longitude": 13.404954,
+  "locationName": "Berlin, Germany"
+}`}</code>
+						</div>
+
+						<!-- Set Tags -->
+						<div class="p-4 bg-gray-50 rounded-xl border border-gray-200">
+							<div class="flex items-center gap-2 mb-3">
+								<span class="px-2 py-0.5 text-xs font-bold rounded bg-emerald-100 text-emerald-700">POST</span>
+								<code class="text-sm font-mono font-medium text-gray-900">/api/images/{'{id}'}/tags</code>
+							</div>
+							<code class="block p-3 bg-white rounded-lg border border-gray-200 text-xs font-mono text-gray-700">{`{ "tagIds": ["tag1", "tag2"] }`}</code>
+						</div>
+
+						<!-- Delete Single -->
+						<div class="p-4 bg-gray-50 rounded-xl border border-gray-200">
+							<div class="flex items-center gap-2">
+								<span class="px-2 py-0.5 text-xs font-bold rounded bg-red-100 text-red-700">DELETE</span>
+								<code class="text-sm font-mono font-medium text-gray-900">/api/images/{'{id}'}</code>
+							</div>
+						</div>
+
+						<!-- Batch Delete -->
+						<div class="p-4 bg-gray-50 rounded-xl border border-gray-200">
+							<div class="flex items-center gap-2 mb-3">
+								<span class="px-2 py-0.5 text-xs font-bold rounded bg-red-100 text-red-700">DELETE</span>
+								<code class="text-sm font-mono font-medium text-gray-900">/api/images</code>
+								<span class="ml-auto text-xs text-gray-400">Batch delete</span>
+							</div>
+							<code class="block p-3 bg-white rounded-lg border border-gray-200 text-xs font-mono text-gray-700">{`{ "ids": ["id1", "id2", "id3"] }`}</code>
+						</div>
+					</div>
+
+				{:else if apiDocsTab === 'tags'}
+					<div class="space-y-3 animate-in">
+						<p class="text-sm text-gray-600 mb-4">Manage tags for organizing images in your gallery.</p>
+
+						<div class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
+							<span class="px-2 py-0.5 text-xs font-bold rounded bg-blue-100 text-blue-700">GET</span>
+							<code class="flex-1 text-xs font-mono text-gray-700 truncate">/api/galleries/{data.gallery.id}/tags</code>
+							<span class="text-xs text-gray-400">List all tags</span>
+						</div>
+						<div class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
+							<span class="px-2 py-0.5 text-xs font-bold rounded bg-emerald-100 text-emerald-700">POST</span>
+							<code class="flex-1 text-xs font-mono text-gray-700 truncate">/api/galleries/{data.gallery.id}/tags</code>
+							<span class="text-xs text-gray-400">Create tag</span>
+						</div>
+						<div class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
+							<span class="px-2 py-0.5 text-xs font-bold rounded bg-amber-100 text-amber-700">PATCH</span>
+							<code class="flex-1 text-xs font-mono text-gray-700 truncate">/api/galleries/{data.gallery.id}/tags/{'{tagId}'}</code>
+							<span class="text-xs text-gray-400">Update tag</span>
+						</div>
+						<div class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
+							<span class="px-2 py-0.5 text-xs font-bold rounded bg-red-100 text-red-700">DELETE</span>
+							<code class="flex-1 text-xs font-mono text-gray-700 truncate">/api/galleries/{data.gallery.id}/tags/{'{tagId}'}</code>
+							<span class="text-xs text-gray-400">Delete tag</span>
+						</div>
+					</div>
+				{/if}
+			</div>
+
+			<!-- Footer -->
+			<div class="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center flex-shrink-0">
+				<p class="text-xs text-gray-400">Base URL: <code class="font-mono">{data.baseUrl}</code></p>
+				<Button variant="ghost" onclick={() => docsOpen = false}>Close</Button>
+			</div>
 		</div>
 	</div>
-	{#snippet footer()}
-		<Button variant="ghost" onclick={() => docsOpen = false}>Close</Button>
-	{/snippet}
-</Modal>
+{/if}
 
 <!-- Selection Mode Bottom Bar -->
 {#if selectionMode}
@@ -958,6 +1232,11 @@ Authorization: Bearer {'{token}'}
 		to { opacity: 1; transform: translateY(0); }
 	}
 
+	@keyframes modal-in {
+		from { opacity: 0; transform: scale(0.95) translateY(10px); }
+		to { opacity: 1; transform: scale(1) translateY(0); }
+	}
+
 	.animate-in {
 		animation: fade-in 0.2s ease-out;
 	}
@@ -968,5 +1247,9 @@ Authorization: Bearer {'{token}'}
 
 	.animate-slide-up {
 		animation: slide-up 0.2s ease-out;
+	}
+
+	.animate-modal-in {
+		animation: modal-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 	}
 </style>

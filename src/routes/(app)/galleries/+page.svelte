@@ -38,9 +38,9 @@
 	<div class="flex items-center justify-between">
 		<div>
 			<h2 class="text-lg font-semibold text-gray-900">Galleries</h2>
-			<p class="text-sm text-gray-500">{data.galleries.length} / {data.maxGalleries} used</p>
+			<p class="text-sm text-gray-500">{data.ownedCount} / {data.maxGalleries} owned</p>
 		</div>
-		{#if data.galleries.length < data.maxGalleries}
+		{#if data.ownedCount < data.maxGalleries}
 			<Button href="/galleries/new">New Gallery</Button>
 		{/if}
 	</div>
@@ -67,9 +67,19 @@
 				{#each data.galleries as gallery}
 					<tr class="hover:bg-gray-50">
 						<Td>
-							<a href="/galleries/{gallery.id}" class="font-medium text-gray-900 hover:underline">
-								{gallery.name}
-							</a>
+							<div class="flex items-center gap-2">
+								<a href="/galleries/{gallery.id}" class="font-medium text-gray-900 hover:underline">
+									{gallery.name}
+								</a>
+								{#if !gallery.isOwner}
+									<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+										<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+										</svg>
+										{gallery.role}
+									</span>
+								{/if}
+							</div>
 						</Td>
 						<Td>{gallery.imageCount}</Td>
 						<Td>{formatBytes(gallery.totalSize)}</Td>
@@ -79,9 +89,11 @@
 								<Button size="sm" variant="ghost" href="/galleries/{gallery.id}">
 									Open
 								</Button>
-								<Button size="sm" variant="ghost" onclick={() => openDeleteModal(gallery)}>
-									Delete
-								</Button>
+								{#if gallery.isOwner}
+									<Button size="sm" variant="ghost" onclick={() => openDeleteModal(gallery)}>
+										Delete
+									</Button>
+								{/if}
 							</div>
 						</Td>
 					</tr>

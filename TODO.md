@@ -4,8 +4,104 @@
 
 Ein minimalistisches, selbst-gehostetes Bild-CDN mit Admin-Dashboard, Gallery-Management und flexibler Speicherung (lokal oder S3).
 
-**Design:** Minimalistisch, eckig, weiss-grau (inspiriert von chat-ms.louist.de)
 **Tech Stack:** SvelteKit, TypeScript, SQLite, Drizzle ORM, Tailwind CSS
+
+---
+
+## Design-Richtlinien
+
+### Grundprinzipien
+- **Minimalistisch & Eckig**: Keine runden Ecken (außer bei Tags/Badges), klare Linien
+- **Farbpalette**: Weiß-Grau mit schwarzen Akzenten, keine bunten Primary-Farben
+- **Schatten**: Subtil oder keine, Tiefe durch Borders erzeugen
+- **Spacing**: Großzügig, Luft lassen
+
+### Komponenten-Patterns
+
+#### Expandable Panels (wie SMTP-Settings)
+Für optionale/erweiterte Inhalte - nicht einfach `{#if}` toggle, sondern:
+```svelte
+<div class="border border-gray-200 bg-white rounded-lg overflow-hidden">
+  <!-- Header mit Icon, Titel und Close-Button -->
+  <div class="p-4 bg-gray-50 border-b border-gray-200">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <svg>...</svg>
+        <span class="text-sm font-medium text-gray-700">Panel Titel</span>
+      </div>
+      <button class="p-1 text-gray-400 hover:text-gray-600">✕</button>
+    </div>
+  </div>
+  <!-- Content -->
+  <div class="p-4">
+    ...
+  </div>
+</div>
+```
+
+#### Buttons
+- **Primary**: `bg-gray-900 text-white hover:bg-gray-800`
+- **Secondary**: `bg-white border border-gray-200 text-gray-700 hover:bg-gray-50`
+- **Ghost**: `text-gray-600 hover:bg-gray-100`
+- **Danger**: `bg-red-600 text-white hover:bg-red-700`
+- **Icon-Button**: `p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100`
+
+#### Cards
+- Border: `border border-gray-200`
+- Background: `bg-white`
+- Header (optional): `bg-gray-50 border-b border-gray-200`
+
+#### Form-Elemente in Panels
+Verschachtelte Konfiguration (wie S3 oder SMTP):
+```svelte
+<div class="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-4">
+  <div class="flex items-center gap-2 text-sm font-medium text-gray-700">
+    <svg>...</svg>
+    Konfigurations-Titel
+  </div>
+  <!-- Form fields -->
+</div>
+```
+
+### Animationen
+```css
+/* Fade-In für Content */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Slide-In für Drawers (von rechts) */
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Slide-Up für Bottom-Bars */
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(100%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+```
+
+### Typography
+- **Headings**: `font-semibold text-gray-900`
+- **Body**: `text-gray-600` oder `text-gray-700`
+- **Muted**: `text-gray-400` oder `text-gray-500`
+- **Labels**: `text-xs font-medium text-gray-400 uppercase tracking-wide`
+- **Code/Mono**: `font-mono text-sm bg-gray-50 border border-gray-200`
+
+### Icons
+- Stroke-Width: `1.5` oder `2`
+- Farbe: `text-gray-400` default, `text-gray-600` bei hover
+- Größe: `w-4 h-4` (small), `w-5 h-5` (medium)
+
+### UI-Komponenten Bibliothek
+Alle Komponenten in `src/lib/components/ui/`:
+- Button, Input, Select, Card, Modal, Toast
+- Table, Th, Td, Pagination
+- Upload, TagBadge, TagSelector, TagManager
+- LocationPicker, Dropdown, DropdownItem
 
 ---
 
@@ -157,17 +253,33 @@ src/
 - [x] 7.5 Bild-Komprimierung Einstellungen
 
 ### Phase 8: User and Image Management
-- [] 8.1 Add user for Galleries to be able to upload images and manage images (collaboration if any added mail address dont have a account send an email with a link to register)
-- [] 8.2 Add to images location and tags (tags are used to filter images in the gallery)
-- [] 8.3 its need to be more falexibel ajustibil how i want to optimize the images like sqoosh.app 
-- [] 8.4 i want the option to selecte with img type is converting to witch format
+- [x] 8.1 Gallery Collaboration System
+  - [x] Collaborators einladen (per Email oder Link)
+  - [x] Invitation-System mit Token
+  - [x] Email-Service für Einladungen (SMTP konfigurierbar)
+  - [x] Collaborator-Rollen (viewer, editor)
+- [x] 8.2 Image Metadata
+  - [x] Tags-System (erstellen, bearbeiten, löschen)
+  - [x] Tag-Filter in Gallery-Ansicht
+  - [x] Location/GPS-Daten (Latitude, Longitude, Name)
+  - [x] LocationPicker-Komponente mit Karte
+  - [x] Image Detail Drawer mit Tabs (Info, Tags, Location)
+- [x] 8.3 Erweiterte Bildoptimierung (wie Squoosh)
+  - [x] Format-Auswahl (JPEG, WebP, AVIF, PNG) - via Gallery Settings
+  - [x] Qualitäts-Slider - via Gallery Settings
+  - [x] Resize-Optionen - via CDN params (?w=, ?h=)
+  - [x] CDN Query-Params: ?f=webp, ?q=80, ?auto
+- [x] 8.4 Format-Konvertierung
+  - [x] Auto-Konvertierung basierend auf Browser-Support (?auto param)
+  - [x] Manuelle Format-Auswahl per CDN (?f=webp/avif/png/jpeg)
+  - [x] Gallery-weite Format-Einstellung in Settings
 
 ### Phase 9: Docker & Deployment
-- [ ] 9.1 Dockerfile erstellen
-- [ ] 9.2 docker-compose.yml
-- [ ] 9.3 Volume-Mapping fuer Bilder und Datenbank
-- [ ] 9.4 Environment-Variablen Dokumentation
-- [ ] 9.5 README.md mit Setup-Anleitung
+- [x] 9.1 Dockerfile erstellen
+- [x] 9.2 docker-compose.yml
+- [x] 9.3 Volume-Mapping fuer Bilder und Datenbank
+- [x] 9.4 Environment-Variablen Dokumentation
+- [x] 9.5 README.md mit Setup-Anleitung
 
 ### Phase 10: Polish & Extras
 - [ ] 10.1 Loading-States ueberall

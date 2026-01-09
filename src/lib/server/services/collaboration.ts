@@ -1,7 +1,7 @@
 import { db, schema } from '../db';
 import { eq, and, or } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
-import { encodeBase64 } from '@oslojs/encoding';
+import { encodeBase64url } from '@oslojs/encoding';
 import type {
 	GalleryCollaborator,
 	GalleryInvitation,
@@ -101,11 +101,11 @@ function getPermissionsForRole(role: CollaboratorRole | 'owner'): GalleryPermiss
 	}
 }
 
-// Generate secure invitation token
+// Generate secure invitation token (URL-safe)
 function generateInviteToken(): string {
 	const bytes = new Uint8Array(24);
 	crypto.getRandomValues(bytes);
-	return encodeBase64(bytes);
+	return encodeBase64url(bytes); // URL-safe: uses - and _ instead of + and /
 }
 
 // Get user's permissions for a gallery
