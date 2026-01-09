@@ -23,11 +23,11 @@ export async function hasAnyUsers(): Promise<boolean> {
 	return (result?.count ?? 0) > 0;
 }
 
-export async function register(email: string, password: string): Promise<RegisterResult> {
-	// Check if registration is allowed (no users exist OR registration is enabled)
+export async function register(email: string, password: string, options?: { bypassRegistrationCheck?: boolean }): Promise<RegisterResult> {
+	// Check if registration is allowed (no users exist OR registration is enabled OR bypass for invites)
 	const hasUsers = await hasAnyUsers();
 
-	if (hasUsers) {
+	if (hasUsers && !options?.bypassRegistrationCheck) {
 		// Check if registration is enabled in settings
 		const setting = await db
 			.select()

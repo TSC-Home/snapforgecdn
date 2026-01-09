@@ -58,15 +58,16 @@
 
 				{#if data.invitation}
 					<input type="hidden" name="inviteToken" value={data.invitation.token} />
+					<input type="hidden" name="email" value={data.invitation.email} />
 				{/if}
 
 				<Input
-					name="email"
+					name={data.invitation ? '_email_display' : 'email'}
 					type="email"
 					label="Email"
 					placeholder="mail@example.com"
 					bind:value={email}
-					required
+					required={!data.invitation}
 					autocomplete="email"
 					disabled={!!data.invitation}
 				/>

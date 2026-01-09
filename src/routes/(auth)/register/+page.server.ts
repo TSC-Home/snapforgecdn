@@ -58,7 +58,19 @@ export const actions: Actions = {
 			return fail(400, { error: 'Passwords do not match', email });
 		}
 
-		const result = await register(email, password);
+		// Check if there's a valid invitation (allows bypassing registration disabled)
+		let validInvitation = null;
+		if (inviteToken) {
+			validInvitation = await getInvitationByToken(inviteToken);
+			// Verify email matches invitation
+			if (validInvitation && validInvitation.email.toLowerCase() !== email.toLowerCase()) {
+				return fail(400, { error: 'Email must match the invitation', email });
+			}
+		}
+
+		const result = await register(email, password, {
+			bypassRegistrationCheck: !!validInvitation
+		});
 
 		if (!result.success) {
 			return fail(400, { error: result.error, email });
