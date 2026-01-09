@@ -10,7 +10,11 @@ const config = {
 			out: 'build',
 			precompress: false,
 			envPrefix: ''
-		})
+		}),
+		csrf: {
+			// Disable origin check when behind reverse proxy (Coolify/Caddy)
+			checkOrigin: false
+		}
 	}
 };
 

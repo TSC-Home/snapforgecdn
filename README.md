@@ -34,7 +34,7 @@ version: '3.8'
 
 services:
   snapforge:
-    image: ghcr.io/yourusername/snapforgecdn:latest
+    image: ghcr.io/TSC-Home/snapforgecdn:latest
     # Or build locally:
     # build: .
     container_name: snapforgecdn

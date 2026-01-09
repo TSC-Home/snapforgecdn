@@ -1,0 +1,29 @@
+version: "3.8"
+
+# Local development docker-compose
+# Usage: docker-compose -f docker-compose.local.yml up
+
+services:
+  snapforge:
+    build: .
+    container_name: snapforgecdn
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - snapforge_data:/app/data
+    environment:
+      - ORIGIN=http://localhost:3000
+      - DATABASE_URL=file:/app/data/snapforge.db
+      - STORAGE_TYPE=local
+      - STORAGE_PATH=/app/data/uploads
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  snapforge_data:
+    driver: local

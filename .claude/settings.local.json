@@ -9,8 +9,8 @@
       "Skill(frontend-design)",
       "Bash(cat:*)",
       "Bash(ls:*)",
-      "Bash(pnpm run check:*)"
+      "Bash(pnpm run check:*)",
+      "Bash(git add:*)"
     ]
   }
 }
-

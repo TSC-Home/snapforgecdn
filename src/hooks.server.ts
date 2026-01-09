@@ -14,10 +14,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	if (session && user) {
 		// Refresh cookie if session was extended
+		const isSecure = event.request.headers.get('x-forwarded-proto') === 'https';
 		event.cookies.set(SESSION_COOKIE_NAME, sessionToken, {
 			path: '/',
 			httpOnly: true,
 			sameSite: 'lax',
+			secure: isSecure,
 			maxAge: 30 * 24 * 60 * 60 // 30 days
 		});
 
