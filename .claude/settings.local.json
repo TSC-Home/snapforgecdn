@@ -10,7 +10,9 @@
       "Bash(cat:*)",
       "Bash(ls:*)",
       "Bash(pnpm run check:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(DATABASE_URL=file:./data/test.db node scripts/init-db.js:*)"
     ]
   }
 }
