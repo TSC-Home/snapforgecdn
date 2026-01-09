@@ -7,8 +7,10 @@ import {
 	getAllSettings,
 	updateGeneralSettings,
 	updateStorageSettings,
-	updateImageSettings
+	updateImageSettings,
+	updateSmtpSettings
 } from '$lib/server/services/settings';
+import { testSmtpConnection, sendTestEmail } from '$lib/server/services/email';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	// Get user data for account settings
@@ -168,5 +170,61 @@ export const actions: Actions = {
 		});
 
 		return { success: true, action: 'storage' };
+	},
+
+	smtp: async ({ request, locals }) => {
+		if (locals.user?.role !== 'admin') {
+			return fail(403, { error: 'Only admins can change settings' });
+		}
+
+		const formData = await request.formData();
+		const enabled = formData.get('enabled') === 'on';
+		const host = (formData.get('host') as string) || '';
+		const port = parseInt(formData.get('port') as string) || 587;
+		const secure = formData.get('secure') === 'on';
+		const username = (formData.get('username') as string) || '';
+		const password = (formData.get('password') as string) || '';
+		const fromEmail = (formData.get('fromEmail') as string) || '';
+		const fromName = (formData.get('fromName') as string) || 'SnapForgeCDN';
+
+		if (enabled && (!host || !fromEmail)) {
+			return fail(400, { error: 'SMTP host and from email are required when enabled', action: 'smtp' });
+		}
+
+		await updateSmtpSettings({
+			enabled,
+			host,
+			port,
+			secure,
+			username,
+			password,
+			fromEmail,
+			fromName
+		});
+
+		return { success: true, action: 'smtp' };
+	},
+
+	testSmtp: async ({ request, locals }) => {
+		if (locals.user?.role !== 'admin') {
+			return fail(403, { error: 'Only admins can test SMTP' });
+		}
+
+		const formData = await request.formData();
+		const testEmail = (formData.get('testEmail') as string) || locals.user.email;
+
+		// First test connection
+		const connectionResult = await testSmtpConnection();
+		if (!connectionResult.success) {
+			return fail(400, { error: `Connection failed: ${connectionResult.error}`, action: 'testSmtp' });
+		}
+
+		// Send test email
+		const emailResult = await sendTestEmail(testEmail);
+		if (!emailResult.success) {
+			return fail(400, { error: `Failed to send: ${emailResult.error}`, action: 'testSmtp' });
+		}
+
+		return { success: true, action: 'testSmtp', message: `Test email sent to ${testEmail}` };
 	}
 };

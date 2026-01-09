@@ -1,28 +1,31 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
-	import { Button, Card, Input, Modal, Pagination, Upload, toast } from '$lib/components/ui';
+	import { Button, Card, Modal, Pagination, Upload, toast, TagBadge, TagSelector, TagManager, LocationPicker } from '$lib/components/ui';
 	import { goto, invalidateAll } from '$app/navigation';
 	import type { Image } from '$lib/server/db/schema';
 
-	let { data, form } = $props();
+	let { data } = $props();
 
-	let showToken = $state(false);
-	let renameModalOpen = $state(false);
-	let tokenModalOpen = $state(false);
-	let imageModalOpen = $state(false);
-	let compressionModalOpen = $state(false);
+	// Modal states
+	let imageDetailOpen = $state(false);
+	let tagsModalOpen = $state(false);
+	let docsOpen = $state(false);
+	let uploadOpen = $state(false);
 	let selectedImage = $state<Image | null>(null);
-	let newName = $state(data.gallery.name);
-	let loading = $state(false);
+	let imageDetailTab = $state<'info' | 'tags' | 'location'>('info');
 
-	// Compression settings state
-	let thumbSize = $state(data.gallery.thumbSize?.toString() ?? '');
-	let thumbQuality = $state(data.gallery.thumbQuality?.toString() ?? '');
-	let imageQuality = $state(data.gallery.imageQuality?.toString() ?? '');
+	// Image metadata editing (inline in detail view)
+	let editingTags = $state<string[]>([]);
+	let editingLocation = $state<{ latitude: number | null; longitude: number | null; locationName: string | null }>({
+		latitude: null,
+		longitude: null,
+		locationName: null
+	});
+	let savingMetadata = $state(false);
+	let hasUnsavedChanges = $state(false);
 
 	// Upload state
 	let uploading = $state(false);
-	let uploadProgress = $state<Map<string, number>>(new Map());
+	let uploadProgress = $state<{ current: number; total: number; currentFile: string; status: 'uploading' | 'processing' }>({ current: 0, total: 0, currentFile: '', status: 'uploading' });
 
 	// Selection mode
 	let selectionMode = $state(false);
@@ -56,12 +59,32 @@
 		goto(`?page=${newPage}`, { keepFocus: true });
 	}
 
-	function openImageModal(image: Image) {
+	function openImageDetail(image: Image) {
 		if (selectionMode) {
 			toggleSelection(image.id);
 		} else {
 			selectedImage = image;
-			imageModalOpen = true;
+			imageDetailTab = 'info';
+			// Load current values for editing
+			editingTags = (data.imageTagsMap[image.id] || []).map(t => t.id);
+			editingLocation = {
+				latitude: image.latitude,
+				longitude: image.longitude,
+				locationName: image.locationName
+			};
+			hasUnsavedChanges = false;
+			imageDetailOpen = true;
+		}
+	}
+
+	function closeImageDetail() {
+		if (hasUnsavedChanges) {
+			if (confirm('You have unsaved changes. Discard them?')) {
+				imageDetailOpen = false;
+				hasUnsavedChanges = false;
+			}
+		} else {
+			imageDetailOpen = false;
 		}
 	}
 
@@ -93,19 +116,23 @@
 		if (files.length === 0) return;
 
 		uploading = true;
+		uploadProgress = { current: 0, total: files.length, currentFile: '', status: 'uploading' };
 		let successCount = 0;
 		let errorCount = 0;
 
-		for (const file of files) {
+		for (let i = 0; i < files.length; i++) {
+			const file = files[i];
+			uploadProgress = { current: i, total: files.length, currentFile: file.name, status: 'uploading' };
+
 			const formData = new FormData();
 			formData.append('file', file);
 
 			try {
+				uploadProgress = { current: i, total: files.length, currentFile: file.name, status: 'processing' };
+
 				const res = await fetch('/api/images/upload', {
 					method: 'POST',
-					headers: {
-						'Authorization': `Bearer ${data.gallery.accessToken}`
-					},
+					headers: { 'Authorization': `Bearer ${data.gallery.accessToken}` },
 					body: formData
 				});
 
@@ -114,12 +141,13 @@
 				} else {
 					errorCount++;
 				}
-			} catch (e) {
+			} catch {
 				errorCount++;
 			}
 		}
 
 		uploading = false;
+		uploadProgress = { current: 0, total: 0, currentFile: '', status: 'uploading' };
 
 		if (successCount > 0) {
 			toast(`${successCount} image${successCount > 1 ? 's' : ''} uploaded`, 'success');
@@ -153,47 +181,167 @@
 				const err = await res.json();
 				toast(err.error ?? 'Error deleting images', 'error');
 			}
-		} catch (e) {
+		} catch {
 			toast('Error deleting images', 'error');
 		}
 		deleting = false;
 	}
 
 	async function deleteSingleImage(imageId: string) {
+		if (!confirm('Delete this image? This cannot be undone.')) return;
+
 		try {
 			const res = await fetch(`/api/images/${imageId}`, {
 				method: 'DELETE',
-				headers: {
-					'Authorization': `Bearer ${data.gallery.accessToken}`
-				}
+				headers: { 'Authorization': `Bearer ${data.gallery.accessToken}` }
 			});
 
 			if (res.ok) {
 				toast('Image deleted', 'success');
-				imageModalOpen = false;
+				imageDetailOpen = false;
 				await invalidateAll();
 			} else {
 				const err = await res.json();
 				toast(err.error ?? 'Error deleting image', 'error');
 			}
-		} catch (e) {
+		} catch {
 			toast('Error deleting image', 'error');
 		}
 	}
 
-	$effect(() => {
-		if (form?.success && form?.action === 'rename') {
-			renameModalOpen = false;
-			toast('Gallery renamed', 'success');
+
+	// Tag filter
+	function filterByTag(tagId: string | null) {
+		if (tagId) {
+			goto(`?tag=${tagId}`, { keepFocus: true });
+		} else {
+			goto('?', { keepFocus: true });
 		}
-		if (form?.success && form?.action === 'regenerateToken') {
-			toast('Token regenerated', 'success');
+	}
+
+	// Tag management
+	async function createTag(name: string, color?: string) {
+		const res = await fetch(`/api/galleries/${data.gallery.id}/tags`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ name, color })
+		});
+		if (res.ok) {
+			toast('Tag created', 'success');
+			await invalidateAll();
+		} else {
+			const err = await res.json();
+			toast(err.error ?? 'Failed to create tag', 'error');
 		}
-		if (form?.success && form?.action === 'compression') {
-			compressionModalOpen = false;
-			toast('Compression settings saved', 'success');
+	}
+
+	async function updateTag(id: string, name: string, color?: string | null) {
+		const res = await fetch(`/api/galleries/${data.gallery.id}/tags/${id}`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ name, color })
+		});
+		if (res.ok) {
+			toast('Tag updated', 'success');
+			await invalidateAll();
+		} else {
+			const err = await res.json();
+			toast(err.error ?? 'Failed to update tag', 'error');
 		}
-	});
+	}
+
+	async function deleteTag(id: string) {
+		const res = await fetch(`/api/galleries/${data.gallery.id}/tags/${id}`, { method: 'DELETE' });
+		if (res.ok) {
+			toast('Tag deleted', 'success');
+			if (data.filterTagId === id) {
+				goto('?', { keepFocus: true });
+			}
+			await invalidateAll();
+		} else {
+			const err = await res.json();
+			toast(err.error ?? 'Failed to delete tag', 'error');
+		}
+	}
+
+	// Save image metadata (tags + location)
+	async function saveImageMetadata() {
+		if (!selectedImage || savingMetadata) return;
+		savingMetadata = true;
+
+		try {
+			// Save tags
+			const tagsRes = await fetch(`/api/images/${selectedImage.id}/tags`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${data.gallery.accessToken}`
+				},
+				body: JSON.stringify({ tagIds: editingTags })
+			});
+
+			if (!tagsRes.ok) {
+				const err = await tagsRes.json();
+				toast(err.error ?? 'Failed to save tags', 'error');
+				savingMetadata = false;
+				return;
+			}
+
+			// Save location
+			const metaRes = await fetch(`/api/images/${selectedImage.id}/metadata`, {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${data.gallery.accessToken}`
+				},
+				body: JSON.stringify({
+					latitude: editingLocation.latitude,
+					longitude: editingLocation.longitude,
+					locationName: editingLocation.locationName
+				})
+			});
+
+			if (!metaRes.ok) {
+				const err = await metaRes.json();
+				toast(err.error ?? 'Failed to save location', 'error');
+				savingMetadata = false;
+				return;
+			}
+
+			toast('Changes saved', 'success');
+			hasUnsavedChanges = false;
+			await invalidateAll();
+		} catch {
+			toast('Failed to save changes', 'error');
+		}
+		savingMetadata = false;
+	}
+
+	async function createTagFromSelector(name: string) {
+		const res = await fetch(`/api/galleries/${data.gallery.id}/tags`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ name })
+		});
+		if (res.ok) {
+			const newTag = await res.json();
+			editingTags = [...editingTags, newTag.id];
+			hasUnsavedChanges = true;
+			await invalidateAll();
+		} else {
+			const err = await res.json();
+			toast(err.error ?? 'Failed to create tag', 'error');
+		}
+	}
+
+	function handleTagsChange(newTags: string[]) {
+		editingTags = newTags;
+		hasUnsavedChanges = true;
+	}
+
+	function handleLocationChange() {
+		hasUnsavedChanges = true;
+	}
 </script>
 
 <svelte:head>
@@ -204,325 +352,621 @@
 	<!-- Header -->
 	<div class="flex items-start justify-between">
 		<div>
-			<a href="/galleries" class="text-sm text-gray-500 hover:text-gray-700 mb-2 block">
-				← Back to Galleries
+			<a href="/galleries" class="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 transition-colors mb-2">
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+				</svg>
+				Galleries
 			</a>
-			<h2 class="text-xl font-semibold text-gray-900">{data.gallery.name}</h2>
-			<p class="text-sm text-gray-500">
-				{data.stats.imageCount} images · {formatBytes(data.stats.totalSize)}
-			</p>
+			<h1 class="text-2xl font-semibold text-gray-900 tracking-tight">{data.gallery.name}</h1>
+			<div class="flex items-center gap-3 mt-1">
+				<span class="text-sm text-gray-500">{data.stats.imageCount} images</span>
+				<span class="text-gray-300">·</span>
+				<span class="text-sm text-gray-500">{formatBytes(data.stats.totalSize)}</span>
+			</div>
 		</div>
-		<div class="flex gap-2">
-			<Button variant="secondary" onclick={() => compressionModalOpen = true}>Settings</Button>
-			<Button variant="secondary" onclick={() => renameModalOpen = true}>Rename</Button>
-			<Button variant="secondary" onclick={() => tokenModalOpen = true}>API Token</Button>
+		<div class="flex items-center gap-2">
+			<Button onclick={() => uploadOpen = !uploadOpen} class={uploadOpen ? 'ring-2 ring-gray-900 ring-offset-2' : ''}>
+				<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+				</svg>
+				Upload
+			</Button>
+			<a
+				href="/galleries/{data.gallery.id}/settings"
+				class="inline-flex items-center justify-center p-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-md shadow-sm hover:bg-gray-50 transition-colors"
+			>
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+				</svg>
+			</a>
 		</div>
 	</div>
 
-	<!-- Upload Zone -->
-	<Upload onfiles={handleFilesSelected} disabled={uploading} />
-
-	{#if uploading}
-		<Card>
-			<div class="flex items-center gap-3">
-				<svg class="animate-spin h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-				</svg>
-				<span class="text-sm text-gray-600">Uploading images...</span>
-			</div>
-		</Card>
-	{/if}
-
-	<!-- API Info Card -->
-	<Card>
-		{#snippet header()}API Access{/snippet}
-		<div class="space-y-3">
-			<div>
-				<span class="block text-sm font-medium text-gray-700 mb-1">Upload URL</span>
-				<div class="flex gap-2">
-					<code class="flex-1 px-3 py-2 bg-gray-100 text-sm font-mono rounded-md overflow-x-auto">
-						POST {data.baseUrl}/api/images/upload
-					</code>
-					<Button size="sm" variant="ghost" onclick={() => copyToClipboard(`${data.baseUrl}/api/images/upload`, 'URL copied')}>
-						Copy
-					</Button>
+	<!-- Upload Zone (Expandable like SMTP settings) -->
+	{#if uploadOpen}
+		<div class="animate-in border border-gray-200 bg-white rounded-lg overflow-hidden">
+			<div class="p-4 bg-gray-50 border-b border-gray-200">
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-2">
+						<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+						</svg>
+						<span class="text-sm font-medium text-gray-700">Upload Images</span>
+					</div>
+					<button type="button" onclick={() => uploadOpen = false} class="p-1 text-gray-400 hover:text-gray-600 transition-colors">
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+						</svg>
+					</button>
 				</div>
 			</div>
-			<div>
-				<span class="block text-sm font-medium text-gray-700 mb-1">Access Token</span>
-				<div class="flex gap-2">
-					<code class="flex-1 px-3 py-2 bg-gray-100 text-sm font-mono rounded-md overflow-x-auto">
-						{showToken ? data.gallery.accessToken : '••••••••••••••••••••••••••••••••'}
-					</code>
-					<Button size="sm" variant="ghost" onclick={() => showToken = !showToken}>
-						{showToken ? 'Hide' : 'Show'}
-					</Button>
-					<Button size="sm" variant="ghost" onclick={() => copyToClipboard(data.gallery.accessToken, 'Token copied')}>
-						Copy
-					</Button>
-				</div>
+			<div class="p-4">
+				{#if uploading}
+					<div class="flex items-center gap-4">
+						<div class="w-10 h-10 flex items-center justify-center border border-gray-200 bg-gray-50 rounded">
+							<svg class="w-5 h-5 text-gray-500 animate-spin" fill="none" viewBox="0 0 24 24">
+								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+							</svg>
+						</div>
+						<div class="flex-1 min-w-0">
+							<div class="flex items-center justify-between mb-1.5">
+								<p class="text-sm font-medium text-gray-900">
+									{uploadProgress.status === 'processing' ? 'Processing' : 'Uploading'} · <span class="font-normal text-gray-500 truncate">{uploadProgress.currentFile}</span>
+								</p>
+								<span class="text-xs tabular-nums text-gray-400 ml-2">{uploadProgress.current + 1}/{uploadProgress.total}</span>
+							</div>
+							<div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+								<div
+									class="h-full rounded-full transition-all duration-300 {uploadProgress.status === 'processing' ? 'bg-amber-500' : 'bg-gray-900'}"
+									style="width: {((uploadProgress.current + (uploadProgress.status === 'processing' ? 0.5 : 0)) / uploadProgress.total) * 100}%"
+								></div>
+							</div>
+						</div>
+					</div>
+				{:else}
+					<Upload onfiles={handleFilesSelected} disabled={uploading} />
+				{/if}
 			</div>
 		</div>
-	</Card>
+	{/if}
 
-	<!-- Images Grid -->
-	<Card>
-		{#snippet header()}
-			<div class="flex items-center justify-between w-full">
-				<span>Images</span>
-				<div class="flex items-center gap-2">
-					{#if selectionMode}
-						<span class="text-sm font-normal text-gray-500">{selectedIds.size} selected</span>
-						<Button size="sm" variant="ghost" onclick={toggleSelectAll}>
-							{selectedIds.size === data.images.length ? 'Deselect all' : 'Select all'}
-						</Button>
-						<Button size="sm" variant="danger" onclick={deleteSelected} loading={deleting} disabled={selectedIds.size === 0}>
-							Delete
-						</Button>
-						<Button size="sm" variant="ghost" onclick={cancelSelection}>Cancel</Button>
-					{:else if data.images.length > 0}
-						<span class="text-sm font-normal text-gray-500">
-							{(data.pagination.page - 1) * data.pagination.perPage + 1}-{Math.min(data.pagination.page * data.pagination.perPage, data.pagination.total)} of {data.pagination.total}
-						</span>
-						<Button size="sm" variant="ghost" onclick={() => selectionMode = true}>Select</Button>
-					{/if}
-				</div>
-			</div>
-		{/snippet}
-
-		{#if data.images.length === 0}
-			<div class="text-center py-12">
-				<p class="text-gray-500 mb-2">No images in this gallery yet.</p>
-				<p class="text-sm text-gray-400">
-					Drag and drop images above or use the API to upload.
-				</p>
-			</div>
-		{:else}
-			<div class="columns-2 sm:columns-3 md:columns-4 lg:columns-5 xl:columns-6 gap-2 space-y-2">
-				{#each data.images as image}
+	<!-- Toolbar -->
+	<div class="flex items-center justify-between">
+		<div class="flex items-center gap-2">
+			<!-- Tag Filter -->
+			{#if data.tags.length > 0}
+				<div class="flex items-center gap-1 flex-wrap">
 					<button
 						type="button"
-						onclick={() => openImageModal(image)}
-						class="w-full bg-gray-100 rounded-md overflow-hidden hover:opacity-90 transition-opacity relative break-inside-avoid mb-2"
+						onclick={() => filterByTag(null)}
+						class="px-2.5 py-1 text-xs font-medium rounded transition-all {!data.filterTagId ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
 					>
-						<img
-							src="{data.baseUrl}/i/{image.id}?thumb"
-							alt={image.originalFilename}
-							class="w-full h-auto object-contain"
-							loading="lazy"
-						/>
-						{#if selectionMode}
-							<div class="absolute inset-0 flex items-center justify-center bg-black/20">
-								<div class="w-6 h-6 border-2 border-white rounded flex items-center justify-center {selectedIds.has(image.id) ? 'bg-gray-900' : 'bg-white/50'}">
-									{#if selectedIds.has(image.id)}
-										<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-										</svg>
+						All
+					</button>
+					{#each data.tags as tag}
+						<button
+							type="button"
+							onclick={() => filterByTag(tag.id)}
+							class="px-2.5 py-1 text-xs font-medium rounded transition-all"
+							style:background-color={data.filterTagId === tag.id ? (tag.color || '#111') : (tag.color ? `${tag.color}20` : '#f3f4f6')}
+							style:color={data.filterTagId === tag.id ? '#fff' : (tag.color || '#4b5563')}
+						>
+							{tag.name}
+						</button>
+					{/each}
+					<button
+						type="button"
+						onclick={() => tagsModalOpen = true}
+						class="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+						title="Manage tags"
+					>
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+						</svg>
+					</button>
+				</div>
+			{:else}
+				<button
+					type="button"
+					onclick={() => tagsModalOpen = true}
+					class="px-2.5 py-1 text-xs font-medium text-gray-500 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+				>
+					+ Add tags
+				</button>
+			{/if}
+		</div>
+
+		<div class="flex items-center gap-2">
+			{#if data.images.length > 0 && !selectionMode}
+				<span class="text-xs text-gray-400 tabular-nums">
+					{(data.pagination.page - 1) * data.pagination.perPage + 1}–{Math.min(data.pagination.page * data.pagination.perPage, data.pagination.total)} of {data.pagination.total}
+				</span>
+				<button
+					type="button"
+					onclick={() => selectionMode = true}
+					class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+					title="Select images"
+				>
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+					</svg>
+				</button>
+				<a
+					href="/galleries/{data.gallery.id}/collaborators"
+					class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+					title="Share gallery"
+				>
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+					</svg>
+				</a>
+				<button
+					type="button"
+					onclick={() => docsOpen = true}
+					class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+					title="API documentation"
+				>
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+					</svg>
+				</button>
+			{/if}
+		</div>
+	</div>
+
+	<!-- Images Grid -->
+	{#if data.images.length === 0}
+		<Card padding="lg">
+			<div class="text-center py-12">
+				<div class="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+					<svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+					</svg>
+				</div>
+				<p class="text-gray-900 font-medium mb-1">No images yet</p>
+				<p class="text-sm text-gray-500 mb-4">Upload images to get started</p>
+				<Button onclick={() => uploadOpen = true}>
+					<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+					</svg>
+					Upload Images
+				</Button>
+			</div>
+		</Card>
+	{:else}
+		<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+			{#each data.images as image}
+				{@const imageTags = data.imageTagsMap[image.id] || []}
+				<button
+					type="button"
+					onclick={() => openImageDetail(image)}
+					class="group relative aspect-square bg-gray-100 rounded-lg overflow-hidden hover:ring-2 hover:ring-gray-900 hover:ring-offset-2 transition-all focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2"
+				>
+					<img
+						src="{data.baseUrl}/i/{image.id}?thumb"
+						alt={image.originalFilename}
+						class="w-full h-full object-cover"
+						loading="lazy"
+					/>
+
+					{#if selectionMode}
+						<div class="absolute inset-0 bg-black/30 flex items-center justify-center">
+							<div class="w-6 h-6 rounded border-2 border-white flex items-center justify-center {selectedIds.has(image.id) ? 'bg-gray-900' : 'bg-white/30'}">
+								{#if selectedIds.has(image.id)}
+									<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+									</svg>
+								{/if}
+							</div>
+						</div>
+					{:else}
+						<!-- Hover overlay with metadata indicators -->
+						<div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+							<div class="absolute bottom-0 left-0 right-0 p-2">
+								<div class="flex items-center gap-1 flex-wrap">
+									{#if image.latitude}
+										<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-white/90 text-gray-700">
+											<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+											</svg>
+										</span>
+									{/if}
+									{#each imageTags.slice(0, 2) as tag}
+										<span
+											class="px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-[60px]"
+											style:background-color={tag.color ? `${tag.color}ee` : '#ffffffee'}
+											style:color={tag.color ? '#fff' : '#374151'}
+										>
+											{tag.name}
+										</span>
+									{/each}
+									{#if imageTags.length > 2}
+										<span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-white/90 text-gray-600">
+											+{imageTags.length - 2}
+										</span>
 									{/if}
 								</div>
 							</div>
-						{/if}
-					</button>
-				{/each}
-			</div>
+						</div>
+					{/if}
+				</button>
+			{/each}
+		</div>
 
-			{#if data.pagination.totalPages > 1}
-				<div class="mt-4 flex justify-center">
-					<Pagination
-						page={data.pagination.page}
-						totalPages={data.pagination.totalPages}
-						onchange={handlePageChange}
-					/>
-				</div>
-			{/if}
+		{#if data.pagination.totalPages > 1}
+			<div class="flex justify-center pt-4">
+				<Pagination
+					page={data.pagination.page}
+					totalPages={data.pagination.totalPages}
+					onchange={handlePageChange}
+				/>
+			</div>
 		{/if}
-	</Card>
+	{/if}
 </div>
 
-<!-- Rename Modal -->
-<Modal bind:open={renameModalOpen} title="Rename Gallery" size="sm">
-	<form
-		method="POST"
-		action="?/rename"
-		use:enhance={() => {
-			loading = true;
-			return async ({ update }) => {
-				await update();
-				loading = false;
-			};
-		}}
-		class="space-y-4"
+<!-- Image Detail Drawer -->
+{#if imageDetailOpen && selectedImage}
+	{@const imageTags = data.imageTagsMap[selectedImage.id] || []}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		class="fixed inset-0 z-50 flex"
+		onkeydown={(e) => e.key === 'Escape' && closeImageDetail()}
+		role="presentation"
 	>
-		{#if form?.error && form?.action !== 'regenerateToken'}
-			<div class="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-md">
-				{form.error}
+		<!-- Backdrop -->
+		<button
+			type="button"
+			class="absolute inset-0 bg-black/50 backdrop-blur-sm"
+			onclick={closeImageDetail}
+			aria-label="Close"
+		></button>
+
+		<!-- Panel -->
+		<div class="relative ml-auto w-full max-w-2xl bg-white shadow-2xl flex flex-col animate-slide-in">
+			<!-- Header -->
+			<div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+				<div class="min-w-0 flex-1">
+					<h2 class="text-lg font-semibold text-gray-900 truncate">{selectedImage.originalFilename}</h2>
+					<p class="text-sm text-gray-500">{formatDate(selectedImage.createdAt)}</p>
+				</div>
+				<div class="flex items-center gap-2 ml-4">
+					{#if hasUnsavedChanges}
+						<Button size="sm" onclick={saveImageMetadata} loading={savingMetadata}>
+							Save Changes
+						</Button>
+					{/if}
+					<button
+						type="button"
+						onclick={closeImageDetail}
+						class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+					>
+						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+						</svg>
+					</button>
+				</div>
 			</div>
-		{/if}
-		<Input name="name" label="Name" bind:value={newName} required />
-		{#snippet footer()}
-			<Button variant="ghost" onclick={() => renameModalOpen = false}>Cancel</Button>
-			<Button type="submit" {loading}>Save</Button>
-		{/snippet}
-	</form>
-</Modal>
 
-<!-- Token Modal -->
-<Modal bind:open={tokenModalOpen} title="API Token" size="md">
-	<div class="space-y-4">
-		<p class="text-sm text-gray-600">
-			Use this token to upload images via the API. Keep this token secret!
-		</p>
-
-		<div>
-			<span class="block text-sm font-medium text-gray-700 mb-1">Access Token</span>
-			<code class="block px-3 py-2 bg-gray-100 text-sm font-mono break-all rounded-md">
-				{data.gallery.accessToken}
-			</code>
-		</div>
-
-		<div>
-			<span class="block text-sm font-medium text-gray-700 mb-1">Header</span>
-			<code class="block px-3 py-2 bg-gray-100 text-sm font-mono rounded-md">
-				Authorization: Bearer {data.gallery.accessToken}
-			</code>
-		</div>
-
-		<div class="pt-2 border-t">
-			<p class="text-sm text-gray-500 mb-2">
-				Regenerate token? The old token will be invalidated immediately.
-			</p>
-			<form
-				method="POST"
-				action="?/regenerateToken"
-				use:enhance={() => {
-					return async ({ update }) => {
-						await update();
-						await invalidateAll();
-					};
-				}}
-			>
-				<Button type="submit" variant="danger" size="sm">Regenerate Token</Button>
-			</form>
-		</div>
-	</div>
-	{#snippet footer()}
-		<Button variant="ghost" onclick={() => tokenModalOpen = false}>Close</Button>
-		<Button onclick={() => copyToClipboard(data.gallery.accessToken, 'Token copied')}>Copy Token</Button>
-	{/snippet}
-</Modal>
-
-<!-- Image Detail Modal -->
-<Modal bind:open={imageModalOpen} title="Image Details" size="lg">
-	{#if selectedImage}
-		<div class="space-y-4">
-			<div class="bg-gray-100 rounded-lg flex items-center justify-center" style="max-height: 400px;">
+			<!-- Image Preview -->
+			<div class="relative bg-gray-950 flex items-center justify-center" style="height: 320px;">
 				<img
 					src="{data.baseUrl}/i/{selectedImage.id}"
 					alt={selectedImage.originalFilename}
-					class="max-w-full max-h-[400px] object-contain rounded"
+					class="max-w-full max-h-full object-contain"
 				/>
+				<a
+					href="{data.baseUrl}/i/{selectedImage.id}"
+					target="_blank"
+					class="absolute top-3 right-3 p-2 bg-black/50 hover:bg-black/70 text-white rounded-lg transition-colors"
+					title="Open original"
+				>
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+					</svg>
+				</a>
 			</div>
 
-			<div class="grid grid-cols-2 gap-4 text-sm">
-				<div>
-					<span class="text-gray-500">Filename</span>
-					<p class="font-medium">{selectedImage.originalFilename}</p>
-				</div>
-				<div>
-					<span class="text-gray-500">Size</span>
-					<p class="font-medium">{formatBytes(selectedImage.sizeBytes)}</p>
-				</div>
-				<div>
-					<span class="text-gray-500">Resolution</span>
-					<p class="font-medium">{selectedImage.width} x {selectedImage.height}</p>
-				</div>
-				<div>
-					<span class="text-gray-500">Uploaded</span>
-					<p class="font-medium">{formatDate(selectedImage.createdAt)}</p>
-				</div>
+			<!-- Tabs -->
+			<div class="border-b border-gray-200">
+				<nav class="flex px-6">
+					<button
+						type="button"
+						onclick={() => imageDetailTab = 'info'}
+						class="px-4 py-3 text-sm font-medium border-b-2 transition-colors {imageDetailTab === 'info' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}"
+					>
+						Info
+					</button>
+					<button
+						type="button"
+						onclick={() => imageDetailTab = 'tags'}
+						class="px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 {imageDetailTab === 'tags' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}"
+					>
+						Tags
+						{#if imageTags.length > 0}
+							<span class="px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-gray-100 text-gray-600">{imageTags.length}</span>
+						{/if}
+					</button>
+					<button
+						type="button"
+						onclick={() => imageDetailTab = 'location'}
+						class="px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 {imageDetailTab === 'location' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}"
+					>
+						Location
+						{#if selectedImage.latitude}
+							<svg class="w-3.5 h-3.5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+								<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+							</svg>
+						{/if}
+					</button>
+				</nav>
 			</div>
 
-			<div>
-				<span class="block text-sm text-gray-500 mb-1">CDN URL</span>
-				<div class="flex gap-2">
-					<code class="flex-1 px-3 py-2 bg-gray-100 text-sm font-mono rounded-md overflow-x-auto">
-						{data.baseUrl}/i/{selectedImage.id}
-					</code>
-					<Button size="sm" variant="ghost" onclick={() => copyToClipboard(`${data.baseUrl}/i/${selectedImage!.id}`, 'URL copied')}>
-						Copy
-					</Button>
+			<!-- Tab Content -->
+			<div class="flex-1 overflow-y-auto p-6">
+				{#if imageDetailTab === 'info'}
+					<div class="space-y-6 animate-in">
+						<!-- File Info -->
+						<div class="grid grid-cols-2 gap-4">
+							<div>
+								<span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Size</span>
+								<p class="mt-1 text-sm font-medium text-gray-900">{formatBytes(selectedImage.sizeBytes)}</p>
+							</div>
+							<div>
+								<span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Resolution</span>
+								<p class="mt-1 text-sm font-medium text-gray-900">{selectedImage.width} × {selectedImage.height}</p>
+							</div>
+							<div>
+								<span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Format</span>
+								<p class="mt-1 text-sm font-medium text-gray-900 uppercase">{selectedImage.mimeType.split('/')[1]}</p>
+							</div>
+							{#if selectedImage.takenAt}
+								<div>
+									<span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Taken</span>
+									<p class="mt-1 text-sm font-medium text-gray-900">{formatDate(selectedImage.takenAt)}</p>
+								</div>
+							{/if}
+						</div>
+
+						<!-- CDN URL -->
+						<div class="pt-4 border-t border-gray-100">
+							<span class="text-xs font-medium text-gray-400 uppercase tracking-wide">CDN URL</span>
+							<div class="mt-2 flex gap-2">
+								<code class="flex-1 px-3 py-2 text-sm font-mono bg-gray-50 border border-gray-200 rounded-lg text-gray-600 truncate">
+									{data.baseUrl}/i/{selectedImage.id}
+								</code>
+								<Button size="sm" variant="secondary" onclick={() => copyToClipboard(`${data.baseUrl}/i/${selectedImage!.id}`, 'URL copied')}>
+									Copy
+								</Button>
+							</div>
+						</div>
+
+						<!-- Quick Tags Preview -->
+						{#if imageTags.length > 0}
+							<div class="pt-4 border-t border-gray-100">
+								<div class="flex items-center justify-between mb-2">
+									<span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Tags</span>
+									<button type="button" onclick={() => imageDetailTab = 'tags'} class="text-xs text-gray-500 hover:text-gray-700">Edit</button>
+								</div>
+								<div class="flex flex-wrap gap-1.5">
+									{#each imageTags as tag}
+										<TagBadge name={tag.name} color={tag.color} />
+									{/each}
+								</div>
+							</div>
+						{/if}
+
+						<!-- Quick Location Preview -->
+						{#if selectedImage.latitude && selectedImage.longitude}
+							<div class="pt-4 border-t border-gray-100">
+								<div class="flex items-center justify-between mb-2">
+									<span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Location</span>
+									<button type="button" onclick={() => imageDetailTab = 'location'} class="text-xs text-gray-500 hover:text-gray-700">Edit</button>
+								</div>
+								<div class="p-3 bg-gray-50 rounded-lg">
+									{#if selectedImage.locationName}
+										<p class="text-sm font-medium text-gray-900">{selectedImage.locationName}</p>
+									{/if}
+									<p class="text-xs text-gray-500 font-mono">
+										{selectedImage.latitude.toFixed(6)}, {selectedImage.longitude.toFixed(6)}
+									</p>
+								</div>
+							</div>
+						{/if}
+					</div>
+
+				{:else if imageDetailTab === 'tags'}
+					<div class="space-y-4 animate-in">
+						<p class="text-sm text-gray-500">Click tags to add or remove them from this image.</p>
+						<TagSelector
+							availableTags={data.tags}
+							selectedTagIds={editingTags}
+							onchange={handleTagsChange}
+							allowCreate
+							oncreate={createTagFromSelector}
+						/>
+						{#if data.tags.length === 0}
+							<div class="pt-4 text-center">
+								<p class="text-sm text-gray-500 mb-2">No tags in this gallery yet.</p>
+								<Button size="sm" variant="secondary" onclick={() => { imageDetailOpen = false; tagsModalOpen = true; }}>
+									Manage Tags
+								</Button>
+							</div>
+						{/if}
+					</div>
+
+				{:else if imageDetailTab === 'location'}
+					<div class="space-y-4 animate-in">
+						<p class="text-sm text-gray-500">Click on the map to set the image location, or search for a place.</p>
+						<LocationPicker
+							bind:latitude={editingLocation.latitude}
+							bind:longitude={editingLocation.longitude}
+							bind:locationName={editingLocation.locationName}
+							onchange={handleLocationChange}
+						/>
+					</div>
+				{/if}
+			</div>
+
+			<!-- Footer -->
+			<div class="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
+				<Button variant="danger" size="sm" onclick={() => deleteSingleImage(selectedImage!.id)}>
+					<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+					</svg>
+					Delete
+				</Button>
+				<div class="flex items-center gap-2">
+					{#if hasUnsavedChanges}
+						<span class="text-xs text-amber-600">Unsaved changes</span>
+					{/if}
+					<Button variant="ghost" onclick={closeImageDetail}>Close</Button>
 				</div>
 			</div>
 		</div>
-		{#snippet footer()}
-			<Button variant="danger" onclick={() => deleteSingleImage(selectedImage!.id)}>Delete</Button>
-			<Button variant="ghost" onclick={() => imageModalOpen = false}>Close</Button>
-			<a href="{data.baseUrl}/i/{selectedImage!.id}" target="_blank" class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium bg-gray-900 text-white hover:bg-gray-800 rounded-md transition-colors">Open Original</a>
-		{/snippet}
-	{/if}
+	</div>
+{/if}
+
+<!-- Tags Management Modal -->
+<Modal bind:open={tagsModalOpen} title="Manage Tags" size="md">
+	<TagManager
+		tags={data.tags}
+		oncreate={createTag}
+		onupdate={updateTag}
+		ondelete={deleteTag}
+	/>
+	{#snippet footer()}
+		<Button variant="ghost" onclick={() => tagsModalOpen = false}>Close</Button>
+	{/snippet}
 </Modal>
 
-<!-- Compression Settings Modal -->
-<Modal bind:open={compressionModalOpen} title="Gallery Settings" size="md">
-	<form
-		method="POST"
-		action="?/compression"
-		use:enhance={() => {
-			loading = true;
-			return async ({ update }) => {
-				await update();
-				loading = false;
-			};
-		}}
-		class="space-y-4"
-	>
-		{#if form?.error && form?.action === 'compression'}
-			<div class="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-md">
-				{form.error}
+<!-- API Documentation Modal -->
+<Modal bind:open={docsOpen} title="API Documentation" size="lg">
+	<div class="space-y-6 text-sm">
+		<div>
+			<h3 class="font-semibold text-gray-900 mb-2">Upload Image</h3>
+			<code class="block p-3 bg-gray-50 border border-gray-200 rounded-lg font-mono text-xs overflow-x-auto">
+POST /api/images/upload<br/>
+Authorization: Bearer {'{token}'}<br/>
+Content-Type: multipart/form-data<br/>
+<br/>
+file: (binary)
+			</code>
+		</div>
+		<div>
+			<h3 class="font-semibold text-gray-900 mb-2">Get Image</h3>
+			<code class="block p-3 bg-gray-50 border border-gray-200 rounded-lg font-mono text-xs">
+GET /i/{'{imageId}'}?thumb&amp;w=800&amp;h=600&amp;q=80
+			</code>
+			<p class="mt-2 text-gray-500">Parameters: <code class="text-gray-700">thumb</code>, <code class="text-gray-700">w</code>, <code class="text-gray-700">h</code>, <code class="text-gray-700">q</code> (quality)</p>
+		</div>
+		<div>
+			<h3 class="font-semibold text-gray-900 mb-2">Delete Image</h3>
+			<code class="block p-3 bg-gray-50 border border-gray-200 rounded-lg font-mono text-xs">
+DELETE /api/images/{'{imageId}'}<br/>
+Authorization: Bearer {'{token}'}
+			</code>
+		</div>
+	</div>
+	{#snippet footer()}
+		<Button variant="ghost" onclick={() => docsOpen = false}>Close</Button>
+	{/snippet}
+</Modal>
+
+<!-- Selection Mode Bottom Bar -->
+{#if selectionMode}
+	<div class="fixed bottom-0 left-0 right-0 z-40 animate-slide-up">
+		<div class="bg-white border-t border-gray-200 shadow-lg">
+			<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+				<div class="flex items-center justify-between h-16">
+					<!-- Left: Selection info -->
+					<div class="flex items-center gap-4">
+						<button
+							type="button"
+							onclick={cancelSelection}
+							class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+							title="Cancel selection"
+						>
+							<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+							</svg>
+						</button>
+						<div class="h-6 w-px bg-gray-200"></div>
+						<div class="flex items-center gap-2">
+							<span class="text-sm font-medium text-gray-900 tabular-nums">{selectedIds.size}</span>
+							<span class="text-sm text-gray-500">selected</span>
+						</div>
+					</div>
+
+					<!-- Center: Actions -->
+					<div class="flex items-center gap-2">
+						<button
+							type="button"
+							onclick={toggleSelectAll}
+							class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+						>
+							{selectedIds.size === data.images.length ? 'Deselect all' : 'Select all'}
+						</button>
+					</div>
+
+					<!-- Right: Delete action -->
+					<div class="flex items-center gap-3">
+						{#if selectedIds.size > 0}
+							<button
+								type="button"
+								onclick={deleteSelected}
+								disabled={deleting}
+								class="px-4 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors flex items-center gap-2"
+							>
+								{#if deleting}
+									<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+									</svg>
+									Deleting...
+								{:else}
+									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+									</svg>
+									Delete {selectedIds.size}
+								{/if}
+							</button>
+						{/if}
+					</div>
+				</div>
 			</div>
-		{/if}
+		</div>
+	</div>
+{/if}
 
-		<p class="text-sm text-gray-600">
-			Override compression settings for this gallery. Leave empty to use system defaults.
-		</p>
+<style>
+	@keyframes fade-in {
+		from { opacity: 0; transform: translateY(4px); }
+		to { opacity: 1; transform: translateY(0); }
+	}
 
-		<Input
-			name="thumbSize"
-			label="Thumbnail Size (px)"
-			type="number"
-			min="50"
-			max="500"
-			placeholder="System default"
-			bind:value={thumbSize}
-			hint="Maximum dimension for thumbnails (50-500px)"
-		/>
+	@keyframes slide-in {
+		from { opacity: 0; transform: translateX(100%); }
+		to { opacity: 1; transform: translateX(0); }
+	}
 
-		<Input
-			name="thumbQuality"
-			label="Thumbnail Quality (%)"
-			type="number"
-			min="10"
-			max="100"
-			placeholder="System default"
-			bind:value={thumbQuality}
-			hint="JPEG compression quality for thumbnails (10-100%)"
-		/>
+	@keyframes slide-up {
+		from { opacity: 0; transform: translateY(100%); }
+		to { opacity: 1; transform: translateY(0); }
+	}
 
-		<Input
-			name="imageQuality"
-			label="Image Quality (%)"
-			type="number"
-			min="10"
-			max="100"
-			placeholder="System default"
-			bind:value={imageQuality}
-			hint="JPEG compression quality for full images (10-100%). Leave empty to serve originals."
-		/>
+	.animate-in {
+		animation: fade-in 0.2s ease-out;
+	}
 
-		{#snippet footer()}
-			<Button variant="ghost" onclick={() => compressionModalOpen = false}>Cancel</Button>
-			<Button type="submit" {loading}>Save</Button>
-		{/snippet}
-	</form>
-</Modal>
+	.animate-slide-in {
+		animation: slide-in 0.3s ease-out;
+	}
+
+	.animate-slide-up {
+		animation: slide-up 0.2s ease-out;
+	}
+</style>

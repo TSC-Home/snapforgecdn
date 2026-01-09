@@ -26,6 +26,9 @@
 		}).format(new Date(date));
 	}
 
+	// SMTP form states
+	let smtpEnabled = $state(data.settings?.smtp.enabled ?? false);
+
 	$effect(() => {
 		if (form?.success) {
 			if (form.action === 'email') {
@@ -36,8 +39,10 @@
 				currentPassword = '';
 				newPassword = '';
 				confirmPassword = '';
-			} else if (form.action === 'general' || form.action === 'storage') {
+			} else if (form.action === 'general' || form.action === 'storage' || form.action === 'smtp') {
 				toast('Settings saved', 'success');
+			} else if (form.action === 'testSmtp') {
+				toast(form.message || 'Test email sent', 'success');
 			}
 		}
 		if (form?.error) {
@@ -48,6 +53,7 @@
 	$effect(() => {
 		if (data.settings) {
 			storageType = data.settings.storage.type;
+			smtpEnabled = data.settings.smtp.enabled;
 		}
 	});
 </script>
@@ -415,6 +421,160 @@
 
 					<div class="pt-4 border-t border-gray-100">
 						<Button type="submit" {loading}>Save Storage</Button>
+					</div>
+				</form>
+			</Card>
+
+			<!-- SMTP Configuration -->
+			<Card>
+				{#snippet header()}
+					<div class="flex items-center gap-2">
+						<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+						</svg>
+						Email (SMTP)
+					</div>
+				{/snippet}
+				<form
+					method="POST"
+					action="?/smtp"
+					use:enhance={() => {
+						loading = true;
+						return async ({ update }) => {
+							await update();
+							loading = false;
+						};
+					}}
+					class="space-y-5"
+				>
+					{#if form?.error && form?.action === 'smtp'}
+						<div class="p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-md">
+							{form.error}
+						</div>
+					{/if}
+
+					<div class="pb-4 border-b border-gray-100">
+						<label class="flex items-start gap-3 cursor-pointer group">
+							<input
+								type="checkbox"
+								name="enabled"
+								bind:checked={smtpEnabled}
+								class="mt-0.5 w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-500 focus:ring-offset-0"
+							/>
+							<div class="flex-1">
+								<span class="text-sm font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
+									Enable email notifications
+								</span>
+								<p class="text-sm text-gray-500">Send invitation emails to collaborators. Without this, you'll need to share invite links manually.</p>
+							</div>
+						</label>
+					</div>
+
+					{#if smtpEnabled}
+						<div class="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-4">
+							<div class="flex items-center gap-2 text-sm font-medium text-gray-700">
+								<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+								</svg>
+								SMTP Server Configuration
+							</div>
+
+							<div class="grid sm:grid-cols-2 gap-4">
+								<Input
+									name="host"
+									label="SMTP Host"
+									value={data.settings.smtp.host}
+									placeholder="smtp.example.com"
+									required={smtpEnabled}
+								/>
+								<Input
+									name="port"
+									label="Port"
+									type="number"
+									value={data.settings.smtp.port.toString()}
+									placeholder="587"
+								/>
+							</div>
+
+							<div class="grid sm:grid-cols-2 gap-4">
+								<Input
+									name="username"
+									label="Username"
+									value={data.settings.smtp.username}
+									placeholder="Optional"
+								/>
+								<Input
+									name="password"
+									label="Password"
+									type="password"
+									value={data.settings.smtp.password}
+									placeholder="Optional"
+								/>
+							</div>
+
+							<div class="pt-2">
+								<label class="flex items-center gap-2 cursor-pointer">
+									<input
+										type="checkbox"
+										name="secure"
+										checked={data.settings.smtp.secure}
+										class="w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-500 focus:ring-offset-0"
+									/>
+									<span class="text-sm text-gray-700">Use TLS/SSL (port 465)</span>
+								</label>
+							</div>
+						</div>
+
+						<div class="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-4">
+							<div class="flex items-center gap-2 text-sm font-medium text-gray-700">
+								<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+								</svg>
+								Sender Information
+							</div>
+
+							<div class="grid sm:grid-cols-2 gap-4">
+								<Input
+									name="fromEmail"
+									label="From Email"
+									type="email"
+									value={data.settings.smtp.fromEmail}
+									placeholder="noreply@example.com"
+									required={smtpEnabled}
+								/>
+								<Input
+									name="fromName"
+									label="From Name"
+									value={data.settings.smtp.fromName}
+									placeholder="SnapForgeCDN"
+								/>
+							</div>
+						</div>
+					{/if}
+
+					<div class="pt-4 border-t border-gray-100 flex items-center justify-between gap-4">
+						{#if smtpEnabled && data.settings.smtp.enabled}
+							<form
+								method="POST"
+								action="?/testSmtp"
+								use:enhance={() => {
+									loading = true;
+									return async ({ update }) => {
+										await update();
+										loading = false;
+									};
+								}}
+								class="flex items-center gap-2"
+							>
+								<input type="hidden" name="testEmail" value={data.user?.email} />
+								<Button type="submit" variant="secondary" {loading}>
+									Send Test Email
+								</Button>
+							</form>
+						{:else}
+							<div></div>
+						{/if}
+						<Button type="submit" {loading}>Save Email Settings</Button>
 					</div>
 				</form>
 			</Card>

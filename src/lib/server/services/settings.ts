@@ -24,10 +24,22 @@ export interface ImageSettings {
 	maxUploadSizeMB: number;
 }
 
+export interface SmtpSettings {
+	enabled: boolean;
+	host: string;
+	port: number;
+	secure: boolean;
+	username: string;
+	password: string;
+	fromEmail: string;
+	fromName: string;
+}
+
 export interface AllSettings {
 	general: GeneralSettings;
 	storage: StorageSettings;
 	images: ImageSettings;
+	smtp: SmtpSettings;
 }
 
 // Default settings (from config)
@@ -50,6 +62,16 @@ function getDefaults(): AllSettings {
 			thumbSize: config.images.thumbSize,
 			thumbQuality: config.images.thumbQuality,
 			maxUploadSizeMB: Math.round(config.images.maxUploadSize / (1024 * 1024))
+		},
+		smtp: {
+			enabled: false,
+			host: '',
+			port: 587,
+			secure: false,
+			username: '',
+			password: '',
+			fromEmail: '',
+			fromName: 'SnapForgeCDN'
 		}
 	};
 }
@@ -84,11 +106,13 @@ export async function getAllSettings(): Promise<AllSettings> {
 	const general = await getSetting<GeneralSettings>('general');
 	const storage = await getSetting<StorageSettings>('storage');
 	const images = await getSetting<ImageSettings>('images');
+	const smtp = await getSetting<SmtpSettings>('smtp');
 
 	return {
 		general: { ...defaults.general, ...general },
 		storage: storage ?? defaults.storage,
-		images: images ?? defaults.images
+		images: images ?? defaults.images,
+		smtp: smtp ?? defaults.smtp
 	};
 }
 
@@ -105,6 +129,23 @@ export async function updateStorageSettings(settings: StorageSettings): Promise<
 // Update image settings
 export async function updateImageSettings(settings: ImageSettings): Promise<void> {
 	await setSetting('images', settings);
+}
+
+// Update SMTP settings
+export async function updateSmtpSettings(settings: SmtpSettings): Promise<void> {
+	await setSetting('smtp', settings);
+}
+
+// Get SMTP settings
+export async function getSmtpSettings(): Promise<SmtpSettings> {
+	const smtp = await getSetting<SmtpSettings>('smtp');
+	return smtp ?? getDefaults().smtp;
+}
+
+// Check if SMTP is configured and enabled
+export async function isSmtpConfigured(): Promise<boolean> {
+	const smtp = await getSmtpSettings();
+	return smtp.enabled && !!smtp.host && !!smtp.fromEmail;
 }
 
 // Check if registration is allowed

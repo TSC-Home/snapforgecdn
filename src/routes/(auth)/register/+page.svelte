@@ -4,6 +4,7 @@
 
 	let { data, form } = $props();
 	let loading = $state(false);
+	let email = $state(data.prefilledEmail || form?.email || '');
 </script>
 
 <svelte:head>
@@ -15,7 +16,9 @@
 		<div class="text-center mb-8">
 			<h1 class="text-2xl font-bold text-gray-900">SnapForgeCDN</h1>
 			<p class="text-gray-500 mt-1">
-				{#if data.isFirstUser}
+				{#if data.invitation}
+					Join gallery
+				{:else if data.isFirstUser}
 					Create admin account
 				{:else}
 					Register
@@ -24,7 +27,13 @@
 		</div>
 
 		<Card>
-			{#if data.isFirstUser}
+			{#if data.invitation}
+				<div class="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-md">
+					<p class="text-sm text-blue-700">
+						You've been invited to join <span class="font-medium">{data.invitation.galleryName}</span>
+					</p>
+				</div>
+			{:else if data.isFirstUser}
 				<div class="mb-4 p-3 bg-gray-100 border border-gray-200 text-gray-700 text-sm rounded-md">
 					You are creating the first account. This will automatically become the admin.
 				</div>
@@ -47,14 +56,19 @@
 					</div>
 				{/if}
 
+				{#if data.invitation}
+					<input type="hidden" name="inviteToken" value={data.invitation.token} />
+				{/if}
+
 				<Input
 					name="email"
 					type="email"
 					label="Email"
 					placeholder="mail@example.com"
-					value={form?.email ?? ''}
+					bind:value={email}
 					required
 					autocomplete="email"
+					disabled={!!data.invitation}
 				/>
 
 				<Input
@@ -76,7 +90,13 @@
 				/>
 
 				<Button type="submit" class="w-full" {loading}>
-					{data.isFirstUser ? 'Create admin' : 'Register'}
+					{#if data.invitation}
+						Create Account & Join
+					{:else if data.isFirstUser}
+						Create admin
+					{:else}
+						Register
+					{/if}
 				</Button>
 			</form>
 

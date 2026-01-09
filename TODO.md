@@ -156,28 +156,34 @@ src/
 - [x] 7.4 S3-Konfiguration UI
 - [x] 7.5 Bild-Komprimierung Einstellungen
 
-### Phase 8: Docker & Deployment
-- [ ] 8.1 Dockerfile erstellen
-- [ ] 8.2 docker-compose.yml
-- [ ] 8.3 Volume-Mapping fuer Bilder und Datenbank
-- [ ] 8.4 Environment-Variablen Dokumentation
-- [ ] 8.5 README.md mit Setup-Anleitung
+### Phase 8: User and Image Management
+- [] 8.1 Add user for Galleries to be able to upload images and manage images (collaboration if any added mail address dont have a account send an email with a link to register)
+- [] 8.2 Add to images location and tags (tags are used to filter images in the gallery)
+- [] 8.3 its need to be more falexibel ajustibil how i want to optimize the images like sqoosh.app 
+- [] 8.4 i want the option to selecte with img type is converting to witch format
 
-### Phase 9: Polish & Extras
-- [ ] 9.1 Loading-States ueberall
-- [ ] 9.2 Error-Handling verbessern
-- [ ] 9.3 Responsive Design testen
-- [ ] 9.4 Dark Mode (optional)
-- [ ] 9.5 API-Dokumentation
+### Phase 9: Docker & Deployment
+- [ ] 9.1 Dockerfile erstellen
+- [ ] 9.2 docker-compose.yml
+- [ ] 9.3 Volume-Mapping fuer Bilder und Datenbank
+- [ ] 9.4 Environment-Variablen Dokumentation
+- [ ] 9.5 README.md mit Setup-Anleitung
 
-### Phase 10: Auto-Update System
-- [ ] 10.1 Version-Check Service (prueft GitHub main Branch)
-- [ ] 10.2 Aktuelle Version in package.json/DB speichern
-- [ ] 10.3 Periodischer Check auf neue Releases (z.B. alle 6 Stunden)
-- [ ] 10.4 Admin-Banner "Neue Version verfuegbar - Klicke zum Update"
-- [ ] 10.5 Update-Endpoint der Docker Container neu baut/pullt
-- [ ] 10.6 Update-Prozess mit Backup-Mechanismus
-- [ ] 10.7 Update-Log/History anzeigen
+### Phase 10: Polish & Extras
+- [ ] 10.1 Loading-States ueberall
+- [ ] 10.2 Error-Handling verbessern
+- [ ] 10.3 Responsive Design testen
+- [ ] 10.4 Dark Mode (optional)
+- [ ] 10.5 API-Dokumentation
+
+### Phase 11: Auto-Update System
+- [ ] 11.1 Version-Check Service (prueft GitHub main Branch)
+- [ ] 11.2 Aktuelle Version in package.json/DB speichern
+- [ ] 11.3 Periodischer Check auf neue Releases (z.B. alle 6 Stunden)
+- [ ] 11.4 Admin-Banner "Neue Version verfuegbar - Klicke zum Update"
+- [ ] 11.5 Update-Endpoint der Docker Container neu baut/pullt
+- [ ] 11.6 Update-Prozess mit Backup-Mechanismus
+- [ ] 11.7 Update-Log/History anzeigen
 
 ---
 

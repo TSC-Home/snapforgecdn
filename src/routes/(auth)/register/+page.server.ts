@@ -3,17 +3,27 @@ import type { Actions, PageServerLoad } from './$types';
 import { register, hasAnyUsers } from '$lib/server/services/auth';
 import { SESSION_COOKIE_NAME } from '$lib/server/services/session';
 import { isRegistrationAllowed } from '$lib/server/services/settings';
+import { getInvitationByToken } from '$lib/server/services/collaboration';
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
 	// Redirect if already logged in
 	if (locals.user) {
 		throw redirect(302, '/dashboard');
 	}
 
+	// Check for invite token
+	const inviteToken = url.searchParams.get('invite');
+	const prefilledEmail = url.searchParams.get('email');
+	let invitation = null;
+
+	if (inviteToken) {
+		invitation = await getInvitationByToken(inviteToken);
+	}
+
 	// Check if registration is allowed
 	const hasUsers = await hasAnyUsers();
 
-	if (hasUsers) {
+	if (hasUsers && !invitation) {
 		// Check if registration is enabled in settings
 		const registrationAllowed = await isRegistrationAllowed();
 
@@ -23,16 +33,25 @@ export const load: PageServerLoad = async ({ locals }) => {
 	}
 
 	return {
-		isFirstUser: !hasUsers
+		isFirstUser: !hasUsers,
+		invitation: invitation ? {
+			token: inviteToken,
+			email: invitation.email,
+			galleryName: invitation.gallery.name
+		} : null,
+		prefilledEmail: prefilledEmail || invitation?.email || ''
 	};
 };
 
+import { acceptInvitation } from '$lib/server/services/collaboration';
+
 export const actions: Actions = {
-	default: async ({ request, cookies }) => {
+	default: async ({ request, cookies, url }) => {
 		const formData = await request.formData();
 		const email = formData.get('email')?.toString() ?? '';
 		const password = formData.get('password')?.toString() ?? '';
 		const confirmPassword = formData.get('confirmPassword')?.toString() ?? '';
+		const inviteToken = formData.get('inviteToken')?.toString() ?? '';
 
 		// Validate passwords match
 		if (password !== confirmPassword) {
@@ -52,6 +71,14 @@ export const actions: Actions = {
 			sameSite: 'lax',
 			maxAge: 30 * 24 * 60 * 60 // 30 days
 		});
+
+		// If there's an invite token, try to accept the invitation
+		if (inviteToken && result.user) {
+			const acceptResult = await acceptInvitation(inviteToken, result.user.id);
+			if (acceptResult.success && acceptResult.galleryId) {
+				throw redirect(302, `/galleries/${acceptResult.galleryId}`);
+			}
+		}
 
 		throw redirect(302, '/dashboard');
 	}

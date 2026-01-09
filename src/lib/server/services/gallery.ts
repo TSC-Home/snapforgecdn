@@ -34,6 +34,16 @@ export async function createGallery(userId: string, name: string): Promise<{ suc
 		thumbSize: null,
 		thumbQuality: null,
 		imageQuality: null,
+		outputFormat: null,
+		resizeMethod: null,
+		jpegQuality: null,
+		webpQuality: null,
+		avifQuality: null,
+		pngCompressionLevel: null,
+		effort: null,
+		chromaSubsampling: null,
+		stripMetadata: null,
+		autoOrient: null,
 		createdAt: new Date(),
 		updatedAt: new Date()
 	};
@@ -67,11 +77,25 @@ export async function getUserGalleries(userId: string): Promise<schema.Gallery[]
 	return db.select().from(schema.galleries).where(eq(schema.galleries.userId, userId)).all();
 }
 
+type OutputFormat = 'original' | 'jpeg' | 'webp' | 'avif' | 'png';
+type ResizeMethod = 'lanczos3' | 'lanczos2' | 'mitchell' | 'catrom' | 'nearest';
+type ChromaSubsampling = '420' | '422' | '444';
+
 export interface GalleryUpdateData {
 	name?: string;
 	thumbSize?: number | null;
 	thumbQuality?: number | null;
 	imageQuality?: number | null;
+	outputFormat?: OutputFormat | null;
+	resizeMethod?: ResizeMethod | null;
+	jpegQuality?: number | null;
+	webpQuality?: number | null;
+	avifQuality?: number | null;
+	pngCompressionLevel?: number | null;
+	effort?: number | null;
+	chromaSubsampling?: ChromaSubsampling | null;
+	stripMetadata?: boolean | null;
+	autoOrient?: boolean | null;
 }
 
 export async function updateGallery(galleryId: string, userId: string, data: GalleryUpdateData): Promise<{ success: boolean; error?: string }> {
@@ -83,7 +107,20 @@ export async function updateGallery(galleryId: string, userId: string, data: Gal
 	await db
 		.update(schema.galleries)
 		.set({
-			...data,
+			name: data.name,
+			thumbSize: data.thumbSize,
+			thumbQuality: data.thumbQuality,
+			imageQuality: data.imageQuality,
+			outputFormat: data.outputFormat,
+			resizeMethod: data.resizeMethod,
+			jpegQuality: data.jpegQuality,
+			webpQuality: data.webpQuality,
+			avifQuality: data.avifQuality,
+			pngCompressionLevel: data.pngCompressionLevel,
+			effort: data.effort,
+			chromaSubsampling: data.chromaSubsampling,
+			stripMetadata: data.stripMetadata,
+			autoOrient: data.autoOrient,
 			updatedAt: new Date()
 		})
 		.where(eq(schema.galleries.id, galleryId));

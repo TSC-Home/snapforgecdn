@@ -7,7 +7,10 @@
       "Bash(pnpm remove:*)",
       "WebFetch(domain:chat-ms.louist.de)",
       "Bash(pnpm check:*)",
-      "Skill(frontend-design)"
+      "Skill(frontend-design)",
+      "Bash(cat:*)",
+      "Bash(ls:*)",
+      "Bash(pnpm run check:*)"
     ]
   }
 }
