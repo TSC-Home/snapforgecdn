@@ -41,6 +41,10 @@ COPY --from=builder --chown=sveltekit:nodejs /app/build ./build
 COPY --from=builder --chown=sveltekit:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=sveltekit:nodejs /app/package.json ./
 
+# Copy init scripts
+COPY --from=builder --chown=sveltekit:nodejs /app/scripts ./scripts
+RUN chmod +x /app/scripts/entrypoint.sh
+
 # Create data directories
 RUN mkdir -p /app/data/uploads && \
     chown -R sveltekit:nodejs /app/data
@@ -62,4 +66,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
 
-CMD ["node", "build"]
+CMD ["/app/scripts/entrypoint.sh"]
