@@ -45,7 +45,10 @@ try {
 
     for (const file of files) {
         console.log(`Applying: ${file}`);
-        const sql = readFileSync(join(migrationsFolder, file), 'utf-8');
+        const rawSql = readFileSync(join(migrationsFolder, file), 'utf-8');
+
+        // Remove drizzle migration markers before splitting
+        const sql = rawSql.replace(/--> statement-breakpoint/g, '');
 
         // Split by statement and execute each
         const statements = sql
