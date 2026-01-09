@@ -21,9 +21,6 @@ COPY . .
 # Build the application
 RUN pnpm build
 
-# Generate migrations for production
-RUN mkdir -p /app/drizzle && pnpm db:generate || true
-
 # Prune dev dependencies
 RUN pnpm prune --prod
 
@@ -44,9 +41,8 @@ COPY --from=builder --chown=sveltekit:nodejs /app/build ./build
 COPY --from=builder --chown=sveltekit:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=sveltekit:nodejs /app/package.json ./
 
-# Copy drizzle migrations and config
+# Copy drizzle migrations
 COPY --from=builder --chown=sveltekit:nodejs /app/drizzle ./drizzle
-COPY --from=builder --chown=sveltekit:nodejs /app/drizzle.config.ts ./
 
 # Copy init scripts
 COPY --from=builder --chown=sveltekit:nodejs /app/scripts ./scripts
