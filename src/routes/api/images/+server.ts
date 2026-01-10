@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { authenticateApiRequest } from '$lib/server/services/api-auth';
 import { deleteImages } from '$lib/server/services/image';
+import { getImageTags } from '$lib/server/services/tags';
 import { db, schema } from '$lib/server/db';
 import { eq, desc, count } from 'drizzle-orm';
 
@@ -37,20 +38,36 @@ export const GET: RequestHandler = async (event) => {
 
 	const baseUrl = event.url.origin;
 
+	// Get tags for all images
+	const imagesWithTags = await Promise.all(
+		images.map(async (img) => {
+			const tags = await getImageTags(img.id);
+			return {
+				id: img.id,
+				filename: img.originalFilename,
+				mimeType: img.mimeType,
+				size: img.sizeBytes,
+				width: img.width,
+				height: img.height,
+				createdAt: img.createdAt,
+				location: {
+					latitude: img.latitude,
+					longitude: img.longitude,
+					altitude: img.altitude,
+					name: img.locationName
+				},
+				takenAt: img.takenAt,
+				tags: tags.map((t) => ({ id: t.id, name: t.name, color: t.color })),
+				urls: {
+					original: `${baseUrl}/i/${img.id}`,
+					thumb: `${baseUrl}/i/${img.id}?thumb`
+				}
+			};
+		})
+	);
+
 	return json({
-		images: images.map((img) => ({
-			id: img.id,
-			filename: img.originalFilename,
-			mimeType: img.mimeType,
-			size: img.sizeBytes,
-			width: img.width,
-			height: img.height,
-			createdAt: img.createdAt,
-			urls: {
-				original: `${baseUrl}/i/${img.id}`,
-				thumb: `${baseUrl}/i/${img.id}?thumb`
-			}
-		})),
+		images: imagesWithTags,
 		pagination: {
 			page,
 			perPage,
