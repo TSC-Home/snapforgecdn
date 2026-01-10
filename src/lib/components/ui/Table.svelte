@@ -9,7 +9,7 @@
 	let { children, header }: Props = $props();
 </script>
 
-<div class="overflow-x-auto border border-gray-200">
+<div class="overflow-x-auto border border-gray-200 rounded-md">
 	<table class="w-full text-sm">
 		{#if header}
 			<thead class="bg-gray-50 border-b border-gray-200">

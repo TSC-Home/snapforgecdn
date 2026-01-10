@@ -106,9 +106,9 @@
 			<button
 				type="button"
 				onclick={() => activeTab = 'general'}
-				class="relative px-4 py-2.5 text-sm font-medium rounded-t-md transition-all duration-200
+				class="relative px-4 py-2.5 text-sm font-medium rounded-t-md cursor-pointer transition-all duration-200
 					{activeTab === 'general'
-						? 'text-gray-900 bg-white border border-b-white border-gray-200 -mb-px'
+						? 'text-gray-900 bg-gray-50 border border-b-0 border-gray-200 -mb-px'
 						: 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}"
 			>
 				General
@@ -116,9 +116,9 @@
 			<button
 				type="button"
 				onclick={() => activeTab = 'processing'}
-				class="relative px-4 py-2.5 text-sm font-medium rounded-t-md transition-all duration-200
+				class="relative px-4 py-2.5 text-sm font-medium cursor-pointer rounded-t-md transition-all duration-200
 					{activeTab === 'processing'
-						? 'text-gray-900 bg-white border border-b-white border-gray-200 -mb-px'
+						? 'text-gray-900 bg-gray-50 border border-b-0 border-gray-200 -mb-px'
 						: 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}"
 			>
 				Processing
@@ -126,9 +126,9 @@
 			<button
 				type="button"
 				onclick={() => activeTab = 'api'}
-				class="relative px-4 py-2.5 text-sm font-medium rounded-t-md transition-all duration-200
+				class="relative px-4 py-2.5 text-sm font-medium rounded-t-md transition-all duration-200 cursor-pointer
 					{activeTab === 'api'
-						? 'text-gray-900 bg-white border border-b-white border-gray-200 -mb-px'
+						? 'text-gray-900 bg-gray-50 border border-b-0  border-gray-200 -mb-px'
 						: 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}"
 			>
 				API
@@ -136,9 +136,9 @@
 			<button
 				type="button"
 				onclick={() => activeTab = 'danger'}
-				class="relative px-4 py-2.5 text-sm font-medium rounded-t-md transition-all duration-200
+				class="relative px-4 py-2.5 text-sm font-medium cursor-pointer rounded-t-md transition-all duration-200
 					{activeTab === 'danger'
-						? 'text-red-600 bg-white border border-b-white border-gray-200 -mb-px'
+						? 'text-red-600 bg-gray-50 border border-b-0 border-gray-200 -mb-px'
 						: 'text-gray-500 hover:text-red-600 hover:bg-gray-50'}"
 			>
 				Danger Zone
@@ -383,7 +383,7 @@
 										type="checkbox"
 										name="stripMetadata"
 										bind:checked={stripMetadata}
-										class="mt-0.5 w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-500 focus:ring-offset-0"
+										class="mt-1.5 w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-500 focus:ring-offset-0"
 									/>
 									<div>
 										<span class="text-sm font-medium text-gray-700 group-hover:text-gray-900">Strip metadata</span>
@@ -395,7 +395,7 @@
 										type="checkbox"
 										name="autoOrient"
 										bind:checked={autoOrient}
-										class="mt-0.5 w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-500 focus:ring-offset-0"
+										class="mt-1.5 w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-500 focus:ring-offset-0"
 									/>
 									<div>
 										<span class="text-sm font-medium text-gray-700 group-hover:text-gray-900">Auto-orient</span>

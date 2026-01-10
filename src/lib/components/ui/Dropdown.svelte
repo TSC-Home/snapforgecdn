@@ -33,7 +33,7 @@
 
 	{#if open}
 		<div
-			class="absolute z-40 mt-1 min-w-[160px] bg-white border border-gray-200 shadow-lg py-1
+			class="absolute z-40 mt-1 min-w-[160px] bg-white border border-gray-200 shadow-lg py-1 rounded-md
 				{align === 'right' ? 'right-0' : 'left-0'}"
 		>
 			{@render children()}

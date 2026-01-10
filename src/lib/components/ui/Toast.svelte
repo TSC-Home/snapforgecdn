@@ -63,7 +63,7 @@
 			<span class="flex-1 text-sm font-medium">{t.message}</span>
 			<button
 				onclick={() => dismissToast(t.id)}
-				class="p-1 hover:bg-black/5 rounded transition-colors"
+				class="p-1 hover:bg-black/5 rounded transition-colors cursor-pointer"
 				aria-label="Dismiss"
 			>
 				<svg class="w-4 h-4 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
