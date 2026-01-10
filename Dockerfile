@@ -59,6 +59,7 @@ ENV PORT=3000
 ENV ORIGIN=http://localhost:3000
 ENV DATABASE_URL=file:/app/data/snapforge.db
 ENV STORAGE_PATH=/app/data/uploads
+ENV BODY_SIZE_LIMIT=52428800
 
 # Switch to non-root user
 USER sveltekit
