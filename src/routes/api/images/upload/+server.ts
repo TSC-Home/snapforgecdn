@@ -1,14 +1,7 @@
 import { json } from '@sveltejs/kit';
-import type { RequestHandler, Config } from './$types';
+import type { RequestHandler } from './$types';
 import { authenticateApiRequest } from '$lib/server/services/api-auth';
 import { uploadImage } from '$lib/server/services/image';
-
-// Increase body size limit for image uploads (50MB)
-export const config: Config = {
-	body: {
-		maxSize: '50mb'
-	}
-};
 
 export const POST: RequestHandler = async (event) => {
 	// Authenticate
