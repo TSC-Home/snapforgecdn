@@ -27,6 +27,23 @@
 	let stripMetadata = $state(data.gallery.stripMetadata ?? false);
 	let autoOrient = $state(data.gallery.autoOrient ?? true);
 
+	// Sync state when data changes (e.g., after invalidateAll)
+	$effect(() => {
+		galleryName = data.gallery.name;
+		thumbSize = data.gallery.thumbSize?.toString() ?? '';
+		thumbQuality = data.gallery.thumbQuality?.toString() ?? '';
+		outputFormat = data.gallery.outputFormat ?? '';
+		resizeMethod = data.gallery.resizeMethod ?? '';
+		jpegQuality = data.gallery.jpegQuality?.toString() ?? '';
+		webpQuality = data.gallery.webpQuality?.toString() ?? '';
+		avifQuality = data.gallery.avifQuality?.toString() ?? '';
+		pngCompressionLevel = data.gallery.pngCompressionLevel?.toString() ?? '';
+		effort = data.gallery.effort?.toString() ?? '';
+		chromaSubsampling = data.gallery.chromaSubsampling ?? '';
+		stripMetadata = data.gallery.stripMetadata ?? false;
+		autoOrient = data.gallery.autoOrient ?? true;
+	});
+
 	function copyToClipboard(text: string, message: string) {
 		navigator.clipboard.writeText(text);
 		toast(message, 'success');
@@ -406,16 +423,28 @@
 						<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
 						</svg>
-						Access Token
+						API Credentials
 					</div>
 				{/snippet}
 				<div class="space-y-4">
 					<p class="text-sm text-gray-600">
-						Use this token to authenticate API requests. Keep it secret!
+						Use these credentials to authenticate API requests. Keep the token secret!
 					</p>
 
 					<div>
-						<span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Token</span>
+						<span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Gallery ID</span>
+						<div class="mt-2 flex gap-2">
+							<code class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 text-sm font-mono break-all rounded-lg">
+								{data.gallery.id}
+							</code>
+							<Button size="sm" variant="ghost" onclick={() => copyToClipboard(data.gallery.id, 'Gallery ID copied')}>
+								Copy
+							</Button>
+						</div>
+					</div>
+
+					<div>
+						<span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Access Token</span>
 						<div class="mt-2 flex gap-2">
 							<code class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 text-sm font-mono break-all rounded-lg">
 								{showToken ? data.gallery.accessToken : '••••••••••••••••••••••••••••••••'}

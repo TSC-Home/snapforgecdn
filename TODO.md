@@ -281,21 +281,14 @@ src/
 - [x] 9.4 Environment-Variablen Dokumentation
 - [x] 9.5 README.md mit Setup-Anleitung
 
-### Phase 10: Polish & Extras
-- [ ] 10.1 Loading-States ueberall
-- [ ] 10.2 Error-Handling verbessern
-- [ ] 10.3 Responsive Design testen
-- [ ] 10.4 Dark Mode (optional)
-- [ ] 10.5 API-Dokumentation
-
-### Phase 11: Auto-Update System
-- [ ] 11.1 Version-Check Service (prueft GitHub main Branch)
-- [ ] 11.2 Aktuelle Version in package.json/DB speichern
-- [ ] 11.3 Periodischer Check auf neue Releases (z.B. alle 6 Stunden)
-- [ ] 11.4 Admin-Banner "Neue Version verfuegbar - Klicke zum Update"
-- [ ] 11.5 Update-Endpoint der Docker Container neu baut/pullt
-- [ ] 11.6 Update-Prozess mit Backup-Mechanismus
-- [ ] 11.7 Update-Log/History anzeigen
+### Phase 10: Auto-Update System
+- [ ] 10.1 Version-Check Service (prueft GitHub main Branch)
+- [ ] 10.2 Aktuelle Version in package.json/DB speichern
+- [ ] 10.3 Periodischer Check auf neue Releases (z.B. alle 6 Stunden)
+- [ ] 10.4 Admin-Banner "Neue Version verfuegbar - Klicke zum Update"
+- [ ] 10.5 Update-Endpoint der Docker Container neu baut/pullt
+- [ ] 10.6 Update-Prozess mit Backup-Mechanismus
+- [ ] 10.7 Update-Log/History anzeigen
 
 ---
 
