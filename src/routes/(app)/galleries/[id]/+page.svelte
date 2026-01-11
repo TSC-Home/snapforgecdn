@@ -552,7 +552,7 @@
 
     <div class="flex items-center gap-2">
       {#if data.images.length > 0 && !selectionMode}
-        <span class="text-xs text-gray-400 tabular-nums w-16">
+        <span class="text-xs text-gray-400 tabular-nums w-full">
           {(data.pagination.page - 1) * data.pagination.perPage + 1}–{Math.min(
             data.pagination.page * data.pagination.perPage,
             data.pagination.total
