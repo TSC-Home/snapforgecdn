@@ -484,24 +484,26 @@
 
   <!-- Toolbar -->
   <div class="flex items-center justify-between">
-    <div class="flex items-center gap-2">
+    <div class="flex items-start gap-2 max-w-10/12">
       <!-- Tag Filter -->
       {#if data.tags.length > 0}
-        <div class="flex items-center gap-1 flex-wrap">
-          <button
-            type="button"
-            onclick={() => filterByTag(null)}
-            class="px-2.5 py-1 text-xs font-medium rounded transition-all cursor-pointer {!data.filterTagId
-              ? 'bg-gray-900 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
-          >
-            All
-          </button>
+        <button
+          type="button"
+          onclick={() => filterByTag(null)}
+          class="px-2.5 py-1 text-xs font-medium rounded transition-all cursor-pointer {!data.filterTagId
+            ? 'bg-gray-900 text-white'
+            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}"
+        >
+          All
+        </button>
+        <div
+          class="flex items-center gap-1 overflow-x-scroll pb-1 w-full custom-scrollbar"
+        >
           {#each data.tags as tag}
             <button
               type="button"
               onclick={() => filterByTag(tag.id)}
-              class="px-2.5 py-1 text-xs font-medium rounded transition-all cursor-pointer"
+              class="px-2.5 py-1 text-xs font-medium rounded transition-all cursor-pointer flex-shrink-0"
               style:background-color={data.filterTagId === tag.id
                 ? tag.color || "#111"
                 : tag.color
@@ -514,26 +516,6 @@
               {tag.name}
             </button>
           {/each}
-          <button
-            type="button"
-            onclick={() => (tagsModalOpen = true)}
-            class="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors cursor-pointer"
-            title="Manage tags"
-          >
-            <svg
-              class="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-              />
-            </svg>
-          </button>
         </div>
       {:else}
         <button
@@ -544,11 +526,33 @@
           + Add tags
         </button>
       {/if}
+      {#if data.tags.length > 0}
+        <button
+          type="button"
+          onclick={() => (tagsModalOpen = true)}
+          class="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors cursor-pointer flex-shrink-0"
+          title="Manage tags"
+        >
+          <svg
+            class="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+            />
+          </svg>
+        </button>
+      {/if}
     </div>
 
     <div class="flex items-center gap-2">
       {#if data.images.length > 0 && !selectionMode}
-        <span class="text-xs text-gray-400 tabular-nums">
+        <span class="text-xs text-gray-400 tabular-nums w-16">
           {(data.pagination.page - 1) * data.pagination.perPage + 1}–{Math.min(
             data.pagination.page * data.pagination.perPage,
             data.pagination.total
@@ -758,12 +762,14 @@
     </div>
 
     {#if data.pagination.totalPages > 1}
-      <div class="flex justify-center pt-4">
-        <Pagination
-          page={data.pagination.page}
-          totalPages={data.pagination.totalPages}
-          onchange={handlePageChange}
-        />
+      <div class="sticky bottom-2 inset-0">
+        <div class="flex justify-center pt-4">
+          <Pagination
+            page={data.pagination.page}
+            totalPages={data.pagination.totalPages}
+            onchange={handlePageChange}
+          />
+        </div>
       </div>
     {/if}
   {/if}
@@ -1893,5 +1899,27 @@
 
   .animate-modal-in {
     animation: modal-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(209, 213, 219) transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgb(209, 213, 219);
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(156, 163, 175);
   }
 </style>
