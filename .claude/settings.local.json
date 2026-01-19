@@ -14,7 +14,8 @@
       "Bash(git push:*)",
       "Bash(DATABASE_URL=file:./data/test.db node scripts/init-db.js:*)",
       "Bash(ORIGIN=https://test.example.com DATABASE_URL=file:./data/test2.db node scripts/init-db.js:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(npm run check:*)"
     ]
   }
 }

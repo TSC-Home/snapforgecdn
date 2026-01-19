@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from "$app/stores";
   import { AppShell, Sidebar, Header } from "$lib/components/layout";
-  import { Dropdown, DropdownItem, Toast } from "$lib/components/ui";
+  import { Dropdown, DropdownItem, Toast, UploadProgress } from "$lib/components/ui";
 
   let { data, children } = $props();
 
@@ -32,6 +32,7 @@
 </script>
 
 <Toast />
+<UploadProgress />
 
 <AppShell>
   {#snippet sidebar()}

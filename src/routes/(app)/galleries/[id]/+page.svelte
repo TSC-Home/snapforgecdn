@@ -10,6 +10,9 @@
     TagSelector,
     TagManager,
     LocationPicker,
+    startUploadSession,
+    updateUploadItem,
+    completeUploadSession,
   } from "$lib/components/ui";
   import { goto, invalidateAll } from "$app/navigation";
   import type { Image } from "$lib/server/db/schema";
@@ -38,15 +41,6 @@
   });
   let savingMetadata = $state(false);
   let hasUnsavedChanges = $state(false);
-
-  // Upload state
-  let uploading = $state(false);
-  let uploadProgress = $state<{
-    current: number;
-    total: number;
-    currentFile: string;
-    status: "uploading" | "processing";
-  }>({ current: 0, total: 0, currentFile: "", status: "uploading" });
 
   // Selection mode
   let selectionMode = $state(false);
@@ -136,35 +130,23 @@
     const files = event.detail;
     if (files.length === 0) return;
 
-    uploading = true;
-    uploadProgress = {
-      current: 0,
-      total: files.length,
-      currentFile: "",
-      status: "uploading",
-    };
-    let successCount = 0;
-    let errorCount = 0;
+    // Close modal immediately and start background upload
+    uploadOpen = false;
 
+    // Start upload session in global store
+    const sessionId = startUploadSession(data.gallery.name, files);
+
+    // Process uploads in background
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      uploadProgress = {
-        current: i,
-        total: files.length,
-        currentFile: file.name,
-        status: "uploading",
-      };
+
+      updateUploadItem(sessionId, i, { status: "uploading" });
 
       const formData = new FormData();
       formData.append("file", file);
 
       try {
-        uploadProgress = {
-          current: i,
-          total: files.length,
-          currentFile: file.name,
-          status: "processing",
-        };
+        updateUploadItem(sessionId, i, { status: "processing" });
 
         const res = await fetch("/api/images/upload", {
           method: "POST",
@@ -173,33 +155,20 @@
         });
 
         if (res.ok) {
-          successCount++;
+          updateUploadItem(sessionId, i, { status: "success" });
         } else {
-          errorCount++;
+          updateUploadItem(sessionId, i, { status: "error" });
         }
       } catch {
-        errorCount++;
+        updateUploadItem(sessionId, i, { status: "error" });
       }
     }
 
-    uploading = false;
-    uploadProgress = {
-      current: 0,
-      total: 0,
-      currentFile: "",
-      status: "uploading",
-    };
+    // Complete the session (will auto-remove after delay)
+    completeUploadSession(sessionId);
 
-    if (successCount > 0) {
-      toast(
-        `${successCount} image${successCount > 1 ? "s" : ""} uploaded`,
-        "success"
-      );
-      await invalidateAll();
-    }
-    if (errorCount > 0) {
-      toast(`${errorCount} upload${errorCount > 1 ? "s" : ""} failed`, "error");
-    }
+    // Refresh the page data
+    await invalidateAll();
   }
 
   async function deleteSelected() {
@@ -1137,15 +1106,14 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="fixed inset-0 z-50 flex items-center justify-center p-4"
-    onkeydown={(e) => e.key === "Escape" && !uploading && (uploadOpen = false)}
+    onkeydown={(e) => e.key === "Escape" && (uploadOpen = false)}
     role="presentation"
   >
     <!-- Backdrop with blur -->
     <button
       type="button"
       class="absolute inset-0 bg-gray-900/40 backdrop-blur-md transition-opacity"
-      onclick={() => !uploading && (uploadOpen = false)}
-      disabled={uploading}
+      onclick={() => (uploadOpen = false)}
       aria-label="Close"
     ></button>
 
@@ -1180,99 +1148,33 @@
             <p class="text-xs text-gray-500">Drag & drop or click to select</p>
           </div>
         </div>
-        {#if !uploading}
-          <button
-            type="button"
-            onclick={() => (uploadOpen = false)}
-            class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+        <button
+          type="button"
+          onclick={() => (uploadOpen = false)}
+          class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
+        >
+          <svg
+            class="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
           >
-            <svg
-              class="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        {/if}
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
       </div>
 
       <!-- Content -->
       <div class="p-6">
-        {#if uploading}
-          <!-- Upload Progress -->
-          <div class="space-y-4">
-            <div class="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
-              <div
-                class="w-12 h-12 rounded-xl bg-gray-900 flex items-center justify-center flex-shrink-0"
-              >
-                <svg
-                  class="w-5 h-5 text-white animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    class="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    stroke-width="3"
-                  ></circle>
-                  <path
-                    class="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center justify-between mb-1">
-                  <p class="text-sm font-medium text-gray-900">
-                    {uploadProgress.status === "processing"
-                      ? "Processing..."
-                      : "Uploading..."}
-                  </p>
-                  <span
-                    class="text-sm tabular-nums font-semibold text-gray-900"
-                  >
-                    {uploadProgress.current + 1} / {uploadProgress.total}
-                  </span>
-                </div>
-                <p class="text-xs text-gray-500 truncate mb-2">
-                  {uploadProgress.currentFile}
-                </p>
-                <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    class="h-full rounded-full transition-all duration-300 {uploadProgress.status ===
-                    'processing'
-                      ? 'bg-amber-500'
-                      : 'bg-gray-900'}"
-                    style="width: {((uploadProgress.current +
-                      (uploadProgress.status === 'processing' ? 0.5 : 0)) /
-                      uploadProgress.total) *
-                      100}%"
-                  ></div>
-                </div>
-              </div>
-            </div>
-            <p class="text-xs text-center text-gray-400">
-              Please wait while your images are being uploaded...
-            </p>
-          </div>
-        {:else}
-          <!-- Drag & Drop Zone -->
-          <Upload onfiles={handleFilesSelected} disabled={uploading} />
-          <p class="mt-3 text-xs text-center text-gray-400">
-            Supports PNG, JPG, WebP, GIF up to 50MB each
-          </p>
-        {/if}
+        <Upload onfiles={handleFilesSelected} />
+        <p class="mt-3 text-xs text-center text-gray-400">
+          Supports PNG, JPG, WebP, GIF up to 50MB each
+        </p>
       </div>
     </div>
   </div>
