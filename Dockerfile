@@ -27,8 +27,8 @@ RUN pnpm prune --prod
 # Production stage
 FROM node:22-alpine AS production
 
-# Install runtime dependencies for sharp
-RUN apk add --no-cache vips
+# Install runtime dependencies for sharp and ffmpeg for video processing
+RUN apk add --no-cache vips ffmpeg
 
 WORKDIR /app
 

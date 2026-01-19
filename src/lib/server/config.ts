@@ -28,6 +28,18 @@ export const config = {
 		allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 	},
 
+	// Video Processing Defaults
+	videos: {
+		maxUploadSize: 500 * 1024 * 1024, // 500MB
+		maxDuration: 3600, // 1 hour
+		allowedMimeTypes: ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska'],
+		defaultCodec: 'h264',
+		defaultQuality: 23, // CRF
+		defaultAudioCodec: 'aac',
+		defaultAudioBitrate: 128, // kbps
+		thumbnailTime: 1 // seconds
+	},
+
 	// User Defaults
 	users: {
 		defaultMaxGalleries: 10

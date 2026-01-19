@@ -2,6 +2,7 @@ import { error, fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { getGallery, getGalleryStats, updateGallery, regenerateAccessToken } from '$lib/server/services/gallery';
 import { getGalleryTagsWithCounts, getImageTags } from '$lib/server/services/tags';
+import { getGalleryVideos, getGalleryVideoStats } from '$lib/server/services/video';
 import { db, schema } from '$lib/server/db';
 import { eq, desc, inArray, and } from 'drizzle-orm';
 
@@ -13,7 +14,10 @@ export const load: PageServerLoad = async ({ params, parent, url }) => {
 		throw error(404, 'Gallery not found');
 	}
 
-	const stats = await getGalleryStats(gallery.id);
+	const [stats, videoStats] = await Promise.all([
+		getGalleryStats(gallery.id),
+		getGalleryVideoStats(gallery.id)
+	]);
 
 	// Get gallery tags with counts
 	const tags = await getGalleryTagsWithCounts(gallery.id);
@@ -100,12 +104,17 @@ export const load: PageServerLoad = async ({ params, parent, url }) => {
 	// Get base URL for CDN links
 	const baseUrl = url.origin;
 
+	// Get videos for this gallery
+	const { videos } = await getGalleryVideos(gallery.id, 1, 100);
+
 	return {
 		gallery,
 		stats,
+		videoStats,
 		tags,
 		filterTagId,
 		images,
+		videos,
 		imageTagsMap,
 		pagination: {
 			page,

@@ -1,15 +1,16 @@
 # SnapForgeCDN
 
-A self-hosted image CDN with admin dashboard, gallery management, and on-the-fly image processing.
+A self-hosted media CDN with admin dashboard, gallery management, and on-the-fly image/video processing.
 
 ## Features
 
-- **Gallery Management** - Organize images in separate galleries with unique access tokens
-- **On-the-fly Processing** - Resize, crop, and convert images via URL parameters
-- **Modern Formats** - JPEG, PNG, WebP, AVIF with auto-detection based on browser support
-- **Tagging & Location** - Organize images with tags and GPS coordinates
-- **Team Collaboration** - Invite collaborators with role-based permissions (Owner, Editor, Viewer)
-- **RESTful API** - Upload and manage images programmatically
+- **Gallery Management** - Organize media in separate galleries with unique access tokens
+- **Image Processing** - Resize, crop, and convert images via URL parameters
+- **Video Processing** - Transcode videos with configurable codecs, quality, and resolution
+- **Modern Formats** - Images: JPEG, PNG, WebP, AVIF | Videos: MP4, WebM (H.264, H.265, VP9, AV1)
+- **Tagging & Location** - Organize media with tags and GPS coordinates
+- **Team Collaboration** - Invite collaborators with role-based permissions
+- **RESTful API** - Upload and manage media programmatically
 - **Background Uploads** - Non-blocking upload with progress indicator
 
 ## Quick Start
@@ -70,6 +71,8 @@ Required for sending collaboration invitations:
 
 ## CDN Usage
 
+### Images
+
 Images are served from `/i/{imageId}` with optional transformations:
 
 | Parameter | Example | Description |
@@ -91,7 +94,16 @@ Images are served from `/i/{imageId}` with optional transformations:
 /i/abc123?auto&q=85    # Best format at 85% quality
 ```
 
-All images are cached for 1 year (`Cache-Control: public, max-age=31536000, immutable`).
+### Videos
+
+Videos are served from `/v/{videoId}`:
+
+```
+/v/xyz789              # Stream video (supports range requests)
+/v/xyz789?thumb        # Video thumbnail
+```
+
+All media is cached for 1 year (`Cache-Control: public, max-age=31536000, immutable`).
 
 ## API
 
@@ -101,25 +113,19 @@ All endpoints require authentication via gallery access token:
 Authorization: Bearer <gallery-access-token>
 ```
 
-### Upload
+### Images
 
 ```bash
+# Upload image
 curl -X POST "https://cdn.example.com/api/images/upload" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -F "file=@photo.jpg"
-```
 
-### List Images
-
-```bash
+# List images
 curl "https://cdn.example.com/api/images?page=1&perPage=50" \
   -H "Authorization: Bearer YOUR_TOKEN"
-```
 
-### Delete
-
-```bash
-# Single image
+# Delete image
 curl -X DELETE "https://cdn.example.com/api/images/{id}" \
   -H "Authorization: Bearer YOUR_TOKEN"
 
@@ -128,6 +134,23 @@ curl -X DELETE "https://cdn.example.com/api/images" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"ids": ["id1", "id2"]}'
+```
+
+### Videos
+
+```bash
+# Upload video
+curl -X POST "https://cdn.example.com/api/videos/upload" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@video.mp4"
+
+# List videos
+curl "https://cdn.example.com/api/videos?page=1&perPage=50" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Delete video
+curl -X DELETE "https://cdn.example.com/api/videos/{id}" \
+  -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
 ### Tags
@@ -156,6 +179,20 @@ PATCH /api/images/{imageId}/metadata
 }
 ```
 
+## Video Processing Settings
+
+Each gallery can have custom video processing settings:
+
+| Setting | Description |
+|---------|-------------|
+| **Output Format** | Keep original, MP4, or WebM |
+| **Video Codec** | H.264, H.265/HEVC, VP9, AV1 |
+| **Quality (CRF)** | 0-51 (lower = better quality) |
+| **Max Resolution** | Limit width/height |
+| **Audio Codec** | AAC, Opus, Copy, or None |
+| **Audio Bitrate** | 32-320 kbps |
+| **Thumbnail** | Auto-generate from video frame |
+
 ## Development
 
 ```bash
@@ -165,11 +202,16 @@ pnpm build        # Production build
 pnpm check        # Type checking
 ```
 
+**Requirements:**
+- Node.js 22+
+- FFmpeg (for video processing)
+
 ## Tech Stack
 
 - **Framework:** SvelteKit 2 + Svelte 5
 - **Database:** SQLite + Drizzle ORM
 - **Image Processing:** Sharp (libvips)
+- **Video Processing:** FFmpeg
 - **Styling:** Tailwind CSS 4
 
 ## License

@@ -44,6 +44,19 @@ export async function createGallery(userId: string, name: string): Promise<{ suc
 		chromaSubsampling: null,
 		stripMetadata: null,
 		autoOrient: null,
+		// Video settings
+		videoEnabled: true,
+		videoMaxSize: null,
+		videoMaxDuration: null,
+		videoOutputFormat: null,
+		videoCodec: null,
+		videoQuality: null,
+		videoMaxWidth: null,
+		videoMaxHeight: null,
+		videoAudioCodec: null,
+		videoAudioBitrate: null,
+		videoGenerateThumbnail: true,
+		videoThumbnailTime: null,
 		createdAt: new Date(),
 		updatedAt: new Date()
 	};
@@ -104,6 +117,9 @@ export async function getUserGalleries(userId: string): Promise<schema.Gallery[]
 type OutputFormat = 'original' | 'jpeg' | 'webp' | 'avif' | 'png';
 type ResizeMethod = 'lanczos3' | 'lanczos2' | 'mitchell' | 'catrom' | 'nearest';
 type ChromaSubsampling = '420' | '422' | '444';
+type VideoOutputFormat = 'original' | 'mp4' | 'webm';
+type VideoCodec = 'h264' | 'h265' | 'vp9' | 'av1';
+type VideoAudioCodec = 'aac' | 'opus' | 'copy' | 'none';
 
 export interface GalleryUpdateData {
 	name?: string;
@@ -120,6 +136,19 @@ export interface GalleryUpdateData {
 	chromaSubsampling?: ChromaSubsampling | null;
 	stripMetadata?: boolean | null;
 	autoOrient?: boolean | null;
+	// Video settings
+	videoEnabled?: boolean | null;
+	videoMaxSize?: number | null;
+	videoMaxDuration?: number | null;
+	videoOutputFormat?: VideoOutputFormat | null;
+	videoCodec?: VideoCodec | null;
+	videoQuality?: number | null;
+	videoMaxWidth?: number | null;
+	videoMaxHeight?: number | null;
+	videoAudioCodec?: VideoAudioCodec | null;
+	videoAudioBitrate?: number | null;
+	videoGenerateThumbnail?: boolean | null;
+	videoThumbnailTime?: number | null;
 }
 
 export async function updateGallery(galleryId: string, userId: string, data: GalleryUpdateData): Promise<{ success: boolean; error?: string }> {
@@ -145,6 +174,19 @@ export async function updateGallery(galleryId: string, userId: string, data: Gal
 			chromaSubsampling: data.chromaSubsampling,
 			stripMetadata: data.stripMetadata,
 			autoOrient: data.autoOrient,
+			// Video settings
+			videoEnabled: data.videoEnabled,
+			videoMaxSize: data.videoMaxSize,
+			videoMaxDuration: data.videoMaxDuration,
+			videoOutputFormat: data.videoOutputFormat,
+			videoCodec: data.videoCodec,
+			videoQuality: data.videoQuality,
+			videoMaxWidth: data.videoMaxWidth,
+			videoMaxHeight: data.videoMaxHeight,
+			videoAudioCodec: data.videoAudioCodec,
+			videoAudioBitrate: data.videoAudioBitrate,
+			videoGenerateThumbnail: data.videoGenerateThumbnail,
+			videoThumbnailTime: data.videoThumbnailTime,
 			updatedAt: new Date()
 		})
 		.where(eq(schema.galleries.id, galleryId));

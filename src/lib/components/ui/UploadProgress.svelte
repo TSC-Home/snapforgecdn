@@ -79,13 +79,16 @@
 
 	export function hasActiveUploads(): boolean {
 		const sessions = get(uploadSessions);
-		return sessions.some((s) => s.items.some((item) => item.status === 'uploading' || item.status === 'processing'));
+		return sessions.some((s) =>
+			s.items.some((item) => item.status === 'uploading' || item.status === 'processing')
+		);
 	}
 </script>
 
 <script lang="ts">
 	import { fly } from 'svelte/transition';
 	import { onMount, onDestroy } from 'svelte';
+	import { browser } from '$app/environment';
 
 	let minimized = $state<Record<string, boolean>>({});
 
@@ -100,7 +103,8 @@
 
 	function isSessionActive(session: UploadSession): boolean {
 		return session.items.some(
-			(item) => item.status === 'uploading' || item.status === 'processing' || item.status === 'pending'
+			(item) =>
+				item.status === 'uploading' || item.status === 'processing' || item.status === 'pending'
 		);
 	}
 
@@ -118,11 +122,15 @@
 	}
 
 	onMount(() => {
-		window.addEventListener('beforeunload', handleBeforeUnload);
+		if (browser) {
+			window.addEventListener('beforeunload', handleBeforeUnload);
+		}
 	});
 
 	onDestroy(() => {
-		window.removeEventListener('beforeunload', handleBeforeUnload);
+		if (browser) {
+			window.removeEventListener('beforeunload', handleBeforeUnload);
+		}
 	});
 </script>
 
@@ -192,7 +200,7 @@
 						type="button"
 						onclick={() => toggleMinimize(session.id)}
 						class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
-						aria-label={minimized[session.id] ? "Expand" : "Minimize"}
+						aria-label={minimized[session.id] ? 'Expand' : 'Minimize'}
 					>
 						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							{#if minimized[session.id]}
@@ -259,9 +267,7 @@
 						<div class="flex items-center gap-2">
 							<div class="flex-shrink-0">
 								{#if currentItem.status === 'processing'}
-									<div
-										class="w-6 h-6 rounded bg-amber-100 flex items-center justify-center"
-									>
+									<div class="w-6 h-6 rounded bg-amber-100 flex items-center justify-center">
 										<svg
 											class="w-3.5 h-3.5 text-amber-600"
 											fill="none"
@@ -277,9 +283,7 @@
 										</svg>
 									</div>
 								{:else}
-									<div
-										class="w-6 h-6 rounded bg-gray-100 flex items-center justify-center"
-									>
+									<div class="w-6 h-6 rounded bg-gray-100 flex items-center justify-center">
 										<svg
 											class="w-3.5 h-3.5 text-gray-500"
 											fill="none"
@@ -335,6 +339,17 @@
 								</span>
 							{/if}
 						</div>
+						<!-- Show failed files with error messages -->
+						{#if session.errorCount > 0}
+							<div class="mt-2 max-h-24 overflow-y-auto">
+								{#each session.items.filter((item) => item.status === 'error') as failedItem}
+									<div class="text-xs py-1 border-t border-gray-50">
+										<p class="text-gray-700 truncate">{failedItem.filename}</p>
+										<p class="text-red-500 truncate">{failedItem.error || 'Upload failed'}</p>
+									</div>
+								{/each}
+							</div>
+						{/if}
 					</div>
 				{/if}
 			{/if}
