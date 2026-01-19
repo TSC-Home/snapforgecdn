@@ -11,7 +11,7 @@ Ein minimalistisches, selbst-gehostetes Bild-CDN mit Admin-Dashboard, Gallery-Ma
 ## Design-Richtlinien
 
 ### Grundprinzipien
-- **Minimalistisch & Eckig**: Keine runden Ecken (außer bei Tags/Badges), klare Linien
+- **Minimalistisch & Eckig**:  runde Ecken (außer bei Tags/Badges), klare Linien
 - **Farbpalette**: Weiß-Grau mit schwarzen Akzenten, keine bunten Primary-Farben
 - **Schatten**: Subtil oder keine, Tiefe durch Borders erzeugen
 - **Spacing**: Großzügig, Luft lassen
