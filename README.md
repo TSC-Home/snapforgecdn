@@ -1,31 +1,30 @@
 # SnapForgeCDN
 
-A minimalist, self-hosted image CDN with admin dashboard, gallery management, and flexible storage (local or S3).
+A self-hosted media CDN with admin dashboard, gallery management, and on-the-fly image/video processing.
 
 ## Features
 
-- **Gallery Management** - Organize images in galleries with access tokens
-- **Image Processing** - On-the-fly resizing, format conversion, compression
-- **Multiple Formats** - JPEG, WebP, AVIF, PNG with auto-detection
-- **Collaboration** - Invite team members with role-based access
-- **Tagging & Location** - Tag images and add GPS coordinates
-- **S3 Support** - Store images locally or on S3-compatible storage
-- **API Access** - RESTful API for programmatic uploads
+- **Gallery Management** - Organize media in separate galleries with unique access tokens
+- **Image Processing** - Resize, crop, and convert images via URL parameters
+- **Video Processing** - Transcode videos with configurable codecs, quality, and resolution
+- **Modern Formats** - Images: JPEG, PNG, WebP, AVIF | Videos: MP4, WebM (H.264, H.265, VP9, AV1)
+- **Tagging & Location** - Organize media with tags and GPS coordinates
+- **Team Collaboration** - Invite collaborators with role-based permissions
+- **RESTful API** - Upload and manage media programmatically
+- **Background Uploads** - Non-blocking upload with progress indicator
 
-## Quick Start with Docker
+## Quick Start
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/snapforgecdn.git
+# Clone and start with Docker
+git clone https://github.com/TSC-Home/snapforgecdn.git
 cd snapforgecdn
-
-# Start with Docker Compose
-docker compose up -d
+docker compose -f docker-compose.local.yml up -d
 
 # Open http://localhost:3000
 ```
 
-The first user to register becomes the admin.
+The first registered user becomes admin.
 
 ## Docker Compose
 
@@ -34,9 +33,7 @@ version: '3.8'
 
 services:
   snapforge:
-    image: ghcr.io/TSC-Home/snapforgecdn:latest
-    # Or build locally:
-    # build: .
+    image: ghcr.io/tsc-home/snapforgecdn:latest
     container_name: snapforgecdn
     restart: unless-stopped
     ports:
@@ -54,32 +51,15 @@ volumes:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ORIGIN` | `http://localhost:3000` | **Required in production.** Public URL of your instance |
+| `ORIGIN` | `http://localhost:3000` | Public URL (required in production) |
 | `PORT` | `3000` | Server port |
 | `HOST` | `0.0.0.0` | Server host |
 | `DATABASE_URL` | `file:/app/data/snapforge.db` | SQLite database path |
-
-### Storage Configuration
-
-**Local Storage (default):**
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `STORAGE_TYPE` | `local` | Storage type |
 | `STORAGE_PATH` | `/app/data/uploads` | Local storage path |
 
-**S3 Storage:**
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `STORAGE_TYPE` | Yes | Set to `s3` |
-| `S3_BUCKET` | Yes | S3 bucket name |
-| `S3_REGION` | Yes | AWS region (e.g., `eu-central-1`) |
-| `S3_ACCESS_KEY` | Yes | AWS access key ID |
-| `S3_SECRET_KEY` | Yes | AWS secret access key |
-| `S3_ENDPOINT` | No | Custom endpoint for S3-compatible storage |
+### Email (Optional)
 
-### Email Configuration (Optional)
-
-For collaboration invitations via email:
+Required for sending collaboration invitations:
 
 | Variable | Description |
 |----------|-------------|
@@ -87,98 +67,152 @@ For collaboration invitations via email:
 | `SMTP_PORT` | SMTP port (default: 587) |
 | `SMTP_USER` | SMTP username |
 | `SMTP_PASS` | SMTP password |
-| `SMTP_FROM` | From address for emails |
+| `SMTP_FROM` | Sender email address |
 
-## API Usage
+## CDN Usage
 
-### Authentication
+### Images
 
-All API requests require the gallery access token:
+Images are served from `/i/{imageId}` with optional transformations:
+
+| Parameter | Example | Description |
+|-----------|---------|-------------|
+| `thumb` | `?thumb` | Thumbnail (150px) |
+| `w` | `?w=800` | Resize to width |
+| `h` | `?h=600` | Resize to height |
+| `w` + `h` | `?w=800&h=600` | Crop to exact dimensions |
+| `q` | `?q=80` | Quality 1-100 |
+| `f` | `?f=webp` | Format: jpeg, webp, avif, png |
+| `auto` | `?auto` | Auto-select WebP/AVIF based on browser |
+
+**Examples:**
+```
+/i/abc123              # Original image
+/i/abc123?thumb        # 150px thumbnail
+/i/abc123?w=800        # Resize to 800px width
+/i/abc123?w=400&h=300  # Crop to 400x300
+/i/abc123?auto&q=85    # Best format at 85% quality
+```
+
+### Videos
+
+Videos are served from `/v/{videoId}`:
+
+```
+/v/xyz789              # Stream video (supports range requests)
+/v/xyz789?thumb        # Video thumbnail
+```
+
+All media is cached for 1 year (`Cache-Control: public, max-age=31536000, immutable`).
+
+## API
+
+All endpoints require authentication via gallery access token:
 
 ```
 Authorization: Bearer <gallery-access-token>
 ```
 
-### Upload Image
+### Images
 
 ```bash
+# Upload image
 curl -X POST "https://cdn.example.com/api/images/upload" \
   -H "Authorization: Bearer YOUR_TOKEN" \
-  -F "file=@image.jpg"
-```
+  -F "file=@photo.jpg"
 
-### Get Image (CDN)
-
-```
-GET /i/{imageId}
-```
-
-**Query Parameters:**
-| Parameter | Example | Description |
-|-----------|---------|-------------|
-| `thumb` | `/i/abc?thumb` | Thumbnail (~150px) |
-| `w` | `/i/abc?w=800` | Width in pixels |
-| `h` | `/i/abc?h=600` | Height in pixels |
-| `q` | `/i/abc?q=80` | Quality (1-100) |
-| `f` | `/i/abc?f=webp` | Format (jpeg, webp, avif, png) |
-| `auto` | `/i/abc?auto` | Auto-select best format based on browser |
-
-**Examples:**
-```
-/i/abc123                    # Original
-/i/abc123?thumb              # Thumbnail
-/i/abc123?w=800              # Resize to 800px width
-/i/abc123?w=800&h=600        # Crop to 800x600
-/i/abc123?f=webp&q=85        # WebP at 85% quality
-/i/abc123?auto               # Auto WebP/AVIF for modern browsers
-```
-
-### List Images
-
-```bash
+# List images
 curl "https://cdn.example.com/api/images?page=1&perPage=50" \
   -H "Authorization: Bearer YOUR_TOKEN"
-```
 
-### Delete Image
-
-```bash
-curl -X DELETE "https://cdn.example.com/api/images/{imageId}" \
+# Delete image
+curl -X DELETE "https://cdn.example.com/api/images/{id}" \
   -H "Authorization: Bearer YOUR_TOKEN"
-```
 
-### Batch Delete
-
-```bash
+# Batch delete
 curl -X DELETE "https://cdn.example.com/api/images" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"ids": ["id1", "id2", "id3"]}'
+  -d '{"ids": ["id1", "id2"]}'
 ```
+
+### Videos
+
+```bash
+# Upload video
+curl -X POST "https://cdn.example.com/api/videos/upload" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@video.mp4"
+
+# List videos
+curl "https://cdn.example.com/api/videos?page=1&perPage=50" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Delete video
+curl -X DELETE "https://cdn.example.com/api/videos/{id}" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Tags
+
+```bash
+# List gallery tags
+GET /api/galleries/{galleryId}/tags
+
+# Create tag
+POST /api/galleries/{galleryId}/tags
+{"name": "vacation", "color": "#3b82f6"}
+
+# Update image tags
+POST /api/images/{imageId}/tags
+{"tagIds": ["tag1", "tag2"]}
+```
+
+### Metadata
+
+```bash
+PATCH /api/images/{imageId}/metadata
+{
+  "latitude": 52.520008,
+  "longitude": 13.404954,
+  "locationName": "Berlin"
+}
+```
+
+## Video Processing Settings
+
+Each gallery can have custom video processing settings:
+
+| Setting | Description |
+|---------|-------------|
+| **Output Format** | Keep original, MP4, or WebM |
+| **Video Codec** | H.264, H.265/HEVC, VP9, AV1 |
+| **Quality (CRF)** | 0-51 (lower = better quality) |
+| **Max Resolution** | Limit width/height |
+| **Audio Codec** | AAC, Opus, Copy, or None |
+| **Audio Bitrate** | 32-320 kbps |
+| **Thumbnail** | Auto-generate from video frame |
 
 ## Development
 
 ```bash
-# Install dependencies
 pnpm install
-
-# Start development server
-pnpm dev
-
-# Build for production
-pnpm build
-
-# Run production build
-node build
+pnpm dev          # Start dev server
+pnpm build        # Production build
+pnpm check        # Type checking
 ```
+
+**Requirements:**
+- Node.js 22+
+- FFmpeg (for video processing)
 
 ## Tech Stack
 
-- **Framework:** SvelteKit
-- **Database:** SQLite with Drizzle ORM
-- **Image Processing:** Sharp
-- **Styling:** Tailwind CSS
-- **Auth:** Session-based with secure tokens
+- **Framework:** SvelteKit 2 + Svelte 5
+- **Database:** SQLite + Drizzle ORM
+- **Image Processing:** Sharp (libvips)
+- **Video Processing:** FFmpeg
+- **Styling:** Tailwind CSS 4
 
 ## License
 

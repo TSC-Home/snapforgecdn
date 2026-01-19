@@ -166,7 +166,7 @@
           </p>
           {#if !compact}
             <p class="text-xs text-gray-400">
-              PNG, JPG, WebP, GIF up to {formatBytes(maxSize)}
+              Images & Videos up to {formatBytes(maxSize)}
             </p>
           {/if}
         {/if}

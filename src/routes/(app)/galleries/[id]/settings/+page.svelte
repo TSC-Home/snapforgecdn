@@ -27,6 +27,20 @@
 	let stripMetadata = $state(data.gallery.stripMetadata ?? false);
 	let autoOrient = $state(data.gallery.autoOrient ?? true);
 
+	// Video processing settings
+	let videoEnabled = $state(data.gallery.videoEnabled ?? true);
+	let videoMaxSize = $state(data.gallery.videoMaxSize?.toString() ?? '');
+	let videoMaxDuration = $state(data.gallery.videoMaxDuration?.toString() ?? '');
+	let videoOutputFormat = $state(data.gallery.videoOutputFormat ?? '');
+	let videoCodec = $state(data.gallery.videoCodec ?? '');
+	let videoQuality = $state(data.gallery.videoQuality?.toString() ?? '');
+	let videoMaxWidth = $state(data.gallery.videoMaxWidth?.toString() ?? '');
+	let videoMaxHeight = $state(data.gallery.videoMaxHeight?.toString() ?? '');
+	let videoAudioCodec = $state(data.gallery.videoAudioCodec ?? '');
+	let videoAudioBitrate = $state(data.gallery.videoAudioBitrate?.toString() ?? '');
+	let videoGenerateThumbnail = $state(data.gallery.videoGenerateThumbnail ?? true);
+	let videoThumbnailTime = $state(data.gallery.videoThumbnailTime?.toString() ?? '');
+
 	// Sync state when data changes (e.g., after invalidateAll)
 	$effect(() => {
 		galleryName = data.gallery.name;
@@ -42,6 +56,19 @@
 		chromaSubsampling = data.gallery.chromaSubsampling ?? '';
 		stripMetadata = data.gallery.stripMetadata ?? false;
 		autoOrient = data.gallery.autoOrient ?? true;
+		// Video settings
+		videoEnabled = data.gallery.videoEnabled ?? true;
+		videoMaxSize = data.gallery.videoMaxSize?.toString() ?? '';
+		videoMaxDuration = data.gallery.videoMaxDuration?.toString() ?? '';
+		videoOutputFormat = data.gallery.videoOutputFormat ?? '';
+		videoCodec = data.gallery.videoCodec ?? '';
+		videoQuality = data.gallery.videoQuality?.toString() ?? '';
+		videoMaxWidth = data.gallery.videoMaxWidth?.toString() ?? '';
+		videoMaxHeight = data.gallery.videoMaxHeight?.toString() ?? '';
+		videoAudioCodec = data.gallery.videoAudioCodec ?? '';
+		videoAudioBitrate = data.gallery.videoAudioBitrate?.toString() ?? '';
+		videoGenerateThumbnail = data.gallery.videoGenerateThumbnail ?? true;
+		videoThumbnailTime = data.gallery.videoThumbnailTime?.toString() ?? '';
 	});
 
 	function copyToClipboard(text: string, message: string) {
@@ -72,6 +99,8 @@
 				invalidateAll();
 			} else if (form.action === 'compression') {
 				toast('Processing settings saved', 'success');
+			} else if (form.action === 'videoSettings') {
+				toast('Video settings saved', 'success');
 			} else if (form.action === 'regenerateToken') {
 				toast('Token regenerated', 'success');
 				invalidateAll();
@@ -408,6 +437,199 @@
 
 					<div class="pt-4 border-t border-gray-100">
 						<Button type="submit" {loading}>Save Processing Settings</Button>
+					</div>
+				</form>
+			</Card>
+
+			<!-- Video Processing Card -->
+			<Card>
+				{#snippet header()}
+					<div class="flex items-center gap-2">
+						<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+						</svg>
+						Video Processing
+					</div>
+				{/snippet}
+				<form
+					method="POST"
+					action="?/videoSettings"
+					use:enhance={() => {
+						loading = true;
+						return async ({ update }) => {
+							await update();
+							loading = false;
+						};
+					}}
+					class="space-y-6"
+				>
+					<div class="flex items-center justify-between">
+						<div>
+							<p class="text-sm font-medium text-gray-900">Enable Video Uploads</p>
+							<p class="text-xs text-gray-500">Allow uploading video files to this gallery</p>
+						</div>
+						<label class="relative inline-flex items-center cursor-pointer">
+							<input
+								type="checkbox"
+								name="videoEnabled"
+								bind:checked={videoEnabled}
+								class="sr-only peer"
+							/>
+							<div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-gray-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gray-900"></div>
+						</label>
+					</div>
+
+					{#if videoEnabled}
+						<!-- Upload Limits -->
+						<div class="space-y-4 pb-5 border-b border-gray-100">
+							<h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Upload Limits</h3>
+							<div class="grid sm:grid-cols-2 gap-4">
+								<Input
+									name="videoMaxSize"
+									label="Max File Size (MB)"
+									type="number"
+									min="1"
+									max="10000"
+									placeholder="Default: 500"
+									bind:value={videoMaxSize}
+									hint="Maximum upload size in megabytes"
+								/>
+								<Input
+									name="videoMaxDuration"
+									label="Max Duration (seconds)"
+									type="number"
+									min="1"
+									max="36000"
+									placeholder="Default: 3600 (1 hour)"
+									bind:value={videoMaxDuration}
+									hint="Maximum video length"
+								/>
+							</div>
+						</div>
+
+						<!-- Output Format -->
+						<div class="space-y-4 pb-5 border-b border-gray-100">
+							<h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Video Output</h3>
+							<div class="grid sm:grid-cols-2 gap-4">
+								<Select
+									name="videoOutputFormat"
+									label="Output Format"
+									bind:value={videoOutputFormat}
+									options={[
+										{ value: '', label: 'Keep original' },
+										{ value: 'mp4', label: 'MP4 - Best compatibility' },
+										{ value: 'webm', label: 'WebM - Modern browsers' }
+									]}
+								/>
+								<Select
+									name="videoCodec"
+									label="Video Codec"
+									bind:value={videoCodec}
+									options={[
+										{ value: '', label: 'Default (H.264)' },
+										{ value: 'h264', label: 'H.264 - Best compatibility' },
+										{ value: 'h265', label: 'H.265/HEVC - Better compression' },
+										{ value: 'vp9', label: 'VP9 - Open format' },
+										{ value: 'av1', label: 'AV1 - Best compression (slow)' }
+									]}
+								/>
+							</div>
+							<div class="grid sm:grid-cols-2 gap-4">
+								<Input
+									name="videoQuality"
+									label="Quality (CRF)"
+									type="number"
+									min="0"
+									max="51"
+									placeholder="Default: 23"
+									bind:value={videoQuality}
+									hint="0-51, lower = better quality, larger files"
+								/>
+								<div class="grid grid-cols-2 gap-2">
+									<Input
+										name="videoMaxWidth"
+										label="Max Width"
+										type="number"
+										min="0"
+										max="7680"
+										placeholder="No limit"
+										bind:value={videoMaxWidth}
+									/>
+									<Input
+										name="videoMaxHeight"
+										label="Max Height"
+										type="number"
+										min="0"
+										max="4320"
+										placeholder="No limit"
+										bind:value={videoMaxHeight}
+									/>
+								</div>
+							</div>
+						</div>
+
+						<!-- Audio Settings -->
+						<div class="space-y-4 pb-5 border-b border-gray-100">
+							<h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Audio</h3>
+							<div class="grid sm:grid-cols-2 gap-4">
+								<Select
+									name="videoAudioCodec"
+									label="Audio Codec"
+									bind:value={videoAudioCodec}
+									options={[
+										{ value: '', label: 'Default (AAC)' },
+										{ value: 'aac', label: 'AAC - Best compatibility' },
+										{ value: 'opus', label: 'Opus - Better quality' },
+										{ value: 'copy', label: 'Copy - Keep original' },
+										{ value: 'none', label: 'None - Remove audio' }
+									]}
+								/>
+								<Input
+									name="videoAudioBitrate"
+									label="Audio Bitrate (kbps)"
+									type="number"
+									min="32"
+									max="320"
+									placeholder="Default: 128"
+									bind:value={videoAudioBitrate}
+								/>
+							</div>
+						</div>
+
+						<!-- Thumbnail -->
+						<div class="space-y-4">
+							<h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Thumbnail</h3>
+							<div class="flex items-start gap-4">
+								<label class="flex items-start gap-3 cursor-pointer group flex-1">
+									<input
+										type="checkbox"
+										name="videoGenerateThumbnail"
+										bind:checked={videoGenerateThumbnail}
+										class="mt-1.5 w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-500 focus:ring-offset-0"
+									/>
+									<div>
+										<span class="text-sm font-medium text-gray-700 group-hover:text-gray-900">Generate thumbnail</span>
+										<p class="text-xs text-gray-500">Extract a frame as preview image</p>
+									</div>
+								</label>
+								{#if videoGenerateThumbnail}
+									<Input
+										name="videoThumbnailTime"
+										label="Time (seconds)"
+										type="number"
+										min="0"
+										placeholder="Default: 1"
+										bind:value={videoThumbnailTime}
+										hint="Frame to capture"
+										class="w-32"
+									/>
+								{/if}
+							</div>
+						</div>
+					{/if}
+
+					<div class="pt-4 border-t border-gray-100">
+						<Button type="submit" {loading}>Save Video Settings</Button>
 					</div>
 				</form>
 			</Card>

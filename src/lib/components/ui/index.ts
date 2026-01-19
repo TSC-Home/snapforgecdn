@@ -11,6 +11,15 @@ export { default as Dropdown } from './Dropdown.svelte';
 export { default as DropdownItem } from './DropdownItem.svelte';
 export { default as Toast, toast, dismissToast, toasts } from './Toast.svelte';
 export { default as Upload } from './Upload.svelte';
+export {
+	default as UploadProgress,
+	uploadSessions,
+	startUploadSession,
+	updateUploadItem,
+	completeUploadSession,
+	cancelUploadSession,
+	hasActiveUploads
+} from './UploadProgress.svelte';
 export { default as LocationPicker } from './LocationPicker.svelte';
 export { default as TagBadge } from './TagBadge.svelte';
 export { default as TagSelector } from './TagSelector.svelte';

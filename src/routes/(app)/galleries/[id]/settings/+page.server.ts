@@ -114,6 +114,57 @@ export const actions: Actions = {
 		return { success: true, action: 'regenerateToken' };
 	},
 
+	videoSettings: async ({ params, request, locals }) => {
+		if (!locals.user) {
+			return fail(401, { error: 'Unauthorized', action: 'videoSettings' });
+		}
+
+		const formData = await request.formData();
+
+		const videoEnabled = formData.get('videoEnabled') === 'on';
+		const videoMaxSizeStr = formData.get('videoMaxSize')?.toString();
+		const videoMaxDurationStr = formData.get('videoMaxDuration')?.toString();
+		const videoOutputFormatStr = formData.get('videoOutputFormat')?.toString();
+		const videoCodecStr = formData.get('videoCodec')?.toString();
+		const videoQualityStr = formData.get('videoQuality')?.toString();
+		const videoMaxWidthStr = formData.get('videoMaxWidth')?.toString();
+		const videoMaxHeightStr = formData.get('videoMaxHeight')?.toString();
+		const videoAudioCodecStr = formData.get('videoAudioCodec')?.toString();
+		const videoAudioBitrateStr = formData.get('videoAudioBitrate')?.toString();
+		const videoGenerateThumbnail = formData.get('videoGenerateThumbnail') === 'on';
+		const videoThumbnailTimeStr = formData.get('videoThumbnailTime')?.toString();
+
+		// Convert MB to bytes for storage
+		const videoMaxSize = videoMaxSizeStr ? parseInt(videoMaxSizeStr) * 1024 * 1024 : null;
+		const videoMaxDuration = videoMaxDurationStr ? parseInt(videoMaxDurationStr) : null;
+		const videoQuality = videoQualityStr ? parseInt(videoQualityStr) : null;
+		const videoMaxWidth = videoMaxWidthStr ? parseInt(videoMaxWidthStr) : null;
+		const videoMaxHeight = videoMaxHeightStr ? parseInt(videoMaxHeightStr) : null;
+		const videoAudioBitrate = videoAudioBitrateStr ? parseInt(videoAudioBitrateStr) : null;
+		const videoThumbnailTime = videoThumbnailTimeStr ? parseInt(videoThumbnailTimeStr) : null;
+
+		const result = await updateGallery(params.id, locals.user.id, {
+			videoEnabled,
+			videoMaxSize,
+			videoMaxDuration,
+			videoOutputFormat: (videoOutputFormatStr || null) as 'original' | 'mp4' | 'webm' | null,
+			videoCodec: (videoCodecStr || null) as 'h264' | 'h265' | 'vp9' | 'av1' | null,
+			videoQuality,
+			videoMaxWidth,
+			videoMaxHeight,
+			videoAudioCodec: (videoAudioCodecStr || null) as 'aac' | 'opus' | 'copy' | 'none' | null,
+			videoAudioBitrate,
+			videoGenerateThumbnail,
+			videoThumbnailTime
+		});
+
+		if (!result.success) {
+			return fail(400, { error: result.error, action: 'videoSettings' });
+		}
+
+		return { success: true, action: 'videoSettings' };
+	},
+
 	delete: async ({ params, locals }) => {
 		if (!locals.user) {
 			return fail(401, { error: 'Unauthorized', action: 'delete' });

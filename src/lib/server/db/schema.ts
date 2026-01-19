@@ -33,6 +33,19 @@ export const galleries = sqliteTable('galleries', {
 	chromaSubsampling: text('chroma_subsampling', { enum: ['420', '422', '444'] }),
 	stripMetadata: integer('strip_metadata', { mode: 'boolean' }),
 	autoOrient: integer('auto_orient', { mode: 'boolean' }).default(true),
+	// Video processing settings
+	videoEnabled: integer('video_enabled', { mode: 'boolean' }).default(true),
+	videoMaxSize: integer('video_max_size'), // Max upload size in bytes
+	videoMaxDuration: integer('video_max_duration'), // Max duration in seconds
+	videoOutputFormat: text('video_output_format', { enum: ['original', 'mp4', 'webm'] }),
+	videoCodec: text('video_codec', { enum: ['h264', 'h265', 'vp9', 'av1'] }),
+	videoQuality: integer('video_quality'), // CRF value (0-51, lower = better)
+	videoMaxWidth: integer('video_max_width'),
+	videoMaxHeight: integer('video_max_height'),
+	videoAudioCodec: text('video_audio_codec', { enum: ['aac', 'opus', 'copy', 'none'] }),
+	videoAudioBitrate: integer('video_audio_bitrate'), // kbps
+	videoGenerateThumbnail: integer('video_generate_thumbnail', { mode: 'boolean' }).default(true),
+	videoThumbnailTime: integer('video_thumbnail_time'), // Seconds into video for thumbnail
 	createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 	updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date())
 });
@@ -53,6 +66,31 @@ export const images = sqliteTable('images', {
 	longitude: real('longitude'),
 	locationName: text('location_name'),
 	altitude: real('altitude'),
+	takenAt: integer('taken_at', { mode: 'timestamp' }),
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date())
+});
+
+// Videos table
+export const videos = sqliteTable('videos', {
+	id: text('id').primaryKey(),
+	galleryId: text('gallery_id').notNull().references(() => galleries.id, { onDelete: 'cascade' }),
+	filename: text('filename').notNull(),
+	originalFilename: text('original_filename').notNull(),
+	mimeType: text('mime_type').notNull(),
+	sizeBytes: integer('size_bytes').notNull(),
+	width: integer('width'),
+	height: integer('height'),
+	duration: real('duration'), // Duration in seconds
+	storagePath: text('storage_path').notNull(),
+	thumbnailPath: text('thumbnail_path'), // Generated thumbnail
+	// Processed versions
+	processedPath: text('processed_path'), // Transcoded version
+	processingStatus: text('processing_status', { enum: ['pending', 'processing', 'completed', 'failed'] }).default('pending'),
+	processingError: text('processing_error'),
+	// Location metadata
+	latitude: real('latitude'),
+	longitude: real('longitude'),
+	locationName: text('location_name'),
 	takenAt: integer('taken_at', { mode: 'timestamp' }),
 	createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date())
 });
@@ -130,6 +168,7 @@ export const galleriesRelations = relations(galleries, ({ one, many }) => ({
 		references: [users.id]
 	}),
 	images: many(images),
+	videos: many(videos),
 	collaborators: many(galleryCollaborators),
 	invitations: many(galleryInvitations),
 	tags: many(imageTags)
@@ -141,6 +180,13 @@ export const imagesRelations = relations(images, ({ one, many }) => ({
 		references: [galleries.id]
 	}),
 	tagAssignments: many(imageTagAssignments)
+}));
+
+export const videosRelations = relations(videos, ({ one }) => ({
+	gallery: one(galleries, {
+		fields: [videos.galleryId],
+		references: [galleries.id]
+	})
 }));
 
 export const galleryCollaboratorsRelations = relations(galleryCollaborators, ({ one }) => ({
@@ -196,6 +242,8 @@ export type Gallery = typeof galleries.$inferSelect;
 export type NewGallery = typeof galleries.$inferInsert;
 export type Image = typeof images.$inferSelect;
 export type NewImage = typeof images.$inferInsert;
+export type Video = typeof videos.$inferSelect;
+export type NewVideo = typeof videos.$inferInsert;
 export type Setting = typeof settings.$inferSelect;
 export type NewSetting = typeof settings.$inferInsert;
 export type Session = typeof sessions.$inferSelect;

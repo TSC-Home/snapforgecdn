@@ -10,18 +10,23 @@
     TagSelector,
     TagManager,
     LocationPicker,
+    startUploadSession,
+    updateUploadItem,
+    completeUploadSession,
   } from "$lib/components/ui";
   import { goto, invalidateAll } from "$app/navigation";
-  import type { Image } from "$lib/server/db/schema";
+  import type { Image, Video } from "$lib/server/db/schema";
 
   let { data } = $props();
 
   // Modal states
   let imageDetailOpen = $state(false);
+  let videoDetailOpen = $state(false);
   let tagsModalOpen = $state(false);
   let docsOpen = $state(false);
   let uploadOpen = $state(false);
   let selectedImage = $state<Image | null>(null);
+  let selectedVideo = $state<Video | null>(null);
   let imageDetailTab = $state<"info" | "tags" | "location">("info");
   let apiDocsTab = $state<"upload" | "images" | "manage" | "tags">("upload");
 
@@ -38,15 +43,6 @@
   });
   let savingMetadata = $state(false);
   let hasUnsavedChanges = $state(false);
-
-  // Upload state
-  let uploading = $state(false);
-  let uploadProgress = $state<{
-    current: number;
-    total: number;
-    currentFile: string;
-    status: "uploading" | "processing";
-  }>({ current: 0, total: 0, currentFile: "", status: "uploading" });
 
   // Selection mode
   let selectionMode = $state(false);
@@ -69,6 +65,46 @@
       hour: "2-digit",
       minute: "2-digit",
     }).format(new Date(date));
+  }
+
+  function formatDuration(seconds: number | null): string {
+    if (!seconds) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  }
+
+  function openVideoDetail(video: Video) {
+    selectedVideo = video;
+    videoDetailOpen = true;
+  }
+
+  function closeVideoDetail() {
+    videoDetailOpen = false;
+    selectedVideo = null;
+  }
+
+  async function deleteSingleVideo(videoId: string) {
+    if (!confirm("Delete this video? This cannot be undone.")) return;
+
+    try {
+      const res = await fetch(`/api/videos/${videoId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${data.gallery.accessToken}` },
+      });
+
+      if (res.ok) {
+        toast("Video deleted", "success");
+        videoDetailOpen = false;
+        selectedVideo = null;
+        await invalidateAll();
+      } else {
+        const err = await res.json();
+        toast(err.error ?? "Error deleting video", "error");
+      }
+    } catch {
+      toast("Error deleting video", "error");
+    }
   }
 
   function copyToClipboard(text: string, message: string) {
@@ -136,70 +172,52 @@
     const files = event.detail;
     if (files.length === 0) return;
 
-    uploading = true;
-    uploadProgress = {
-      current: 0,
-      total: files.length,
-      currentFile: "",
-      status: "uploading",
-    };
-    let successCount = 0;
-    let errorCount = 0;
+    // Close modal immediately and start background upload
+    uploadOpen = false;
 
+    // Start upload session in global store
+    const sessionId = startUploadSession(data.gallery.name, files);
+
+    // Process uploads in background
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      uploadProgress = {
-        current: i,
-        total: files.length,
-        currentFile: file.name,
-        status: "uploading",
-      };
+
+      updateUploadItem(sessionId, i, { status: "uploading" });
 
       const formData = new FormData();
       formData.append("file", file);
 
-      try {
-        uploadProgress = {
-          current: i,
-          total: files.length,
-          currentFile: file.name,
-          status: "processing",
-        };
+      // Determine if this is a video or image upload
+      const isVideo = file.type.startsWith("video/");
+      const uploadEndpoint = isVideo ? "/api/videos/upload" : "/api/images/upload";
 
-        const res = await fetch("/api/images/upload", {
+      try {
+        updateUploadItem(sessionId, i, { status: "processing" });
+
+        const res = await fetch(uploadEndpoint, {
           method: "POST",
           headers: { Authorization: `Bearer ${data.gallery.accessToken}` },
           body: formData,
         });
 
         if (res.ok) {
-          successCount++;
+          updateUploadItem(sessionId, i, { status: "success" });
         } else {
-          errorCount++;
+          const errorData = await res.json().catch(() => ({ error: "Upload failed" }));
+          console.error(`Upload failed for ${file.name}:`, errorData);
+          updateUploadItem(sessionId, i, { status: "error", error: errorData.error });
         }
-      } catch {
-        errorCount++;
+      } catch (err) {
+        console.error(`Upload error for ${file.name}:`, err);
+        updateUploadItem(sessionId, i, { status: "error", error: "Network error" });
       }
     }
 
-    uploading = false;
-    uploadProgress = {
-      current: 0,
-      total: 0,
-      currentFile: "",
-      status: "uploading",
-    };
+    // Complete the session (will auto-remove after delay)
+    completeUploadSession(sessionId);
 
-    if (successCount > 0) {
-      toast(
-        `${successCount} image${successCount > 1 ? "s" : ""} uploaded`,
-        "success"
-      );
-      await invalidateAll();
-    }
-    if (errorCount > 0) {
-      toast(`${errorCount} upload${errorCount > 1 ? "s" : ""} failed`, "error");
-    }
+    // Refresh the page data
+    await invalidateAll();
   }
 
   async function deleteSelected() {
@@ -773,6 +791,58 @@
       </div>
     {/if}
   {/if}
+
+  <!-- Videos Section -->
+  {#if data.videos && data.videos.length > 0}
+    <div class="mt-8">
+      <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        </svg>
+        Videos ({data.videos.length})
+      </h3>
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+        {#each data.videos as video}
+          <button
+            type="button"
+            onclick={() => openVideoDetail(video)}
+            class="group cursor-pointer relative aspect-video bg-gray-100 rounded-lg overflow-hidden hover:ring-2 hover:ring-gray-900 hover:ring-offset-2 transition-all focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2"
+          >
+            {#if video.thumbnailPath}
+              <img
+                src="{data.baseUrl}/v/{video.id}?thumb"
+                alt={video.originalFilename}
+                class="w-full h-full object-cover"
+                loading="lazy"
+              />
+            {:else}
+              <div class="w-full h-full flex items-center justify-center bg-gray-200">
+                <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </div>
+            {/if}
+
+            <!-- Play icon overlay -->
+            <div class="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
+              <div class="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+                <svg class="w-5 h-5 text-gray-900 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </div>
+            </div>
+
+            <!-- Duration badge -->
+            {#if video.duration}
+              <div class="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/70 rounded text-xs text-white font-medium">
+                {formatDuration(video.duration)}
+              </div>
+            {/if}
+          </button>
+        {/each}
+      </div>
+    </div>
+  {/if}
 </div>
 
 <!-- Image Detail Drawer -->
@@ -1132,20 +1202,156 @@
   </div>
 {/if}
 
+<!-- Video Detail Drawer -->
+{#if videoDetailOpen && selectedVideo}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="fixed inset-0 z-50 flex"
+    onkeydown={(e) => e.key === "Escape" && closeVideoDetail()}
+    role="presentation"
+  >
+    <!-- Backdrop -->
+    <button
+      type="button"
+      class="absolute inset-0 bg-black/50 backdrop-blur-sm"
+      onclick={closeVideoDetail}
+      aria-label="Close"
+    ></button>
+
+    <!-- Panel -->
+    <div
+      class="relative ml-auto w-full max-w-2xl bg-white shadow-2xl flex flex-col animate-slide-in"
+    >
+      <!-- Header -->
+      <div
+        class="flex items-center justify-between px-6 py-4 border-b border-gray-100"
+      >
+        <div class="min-w-0 flex-1">
+          <h2 class="text-lg font-semibold text-gray-900 truncate">
+            {selectedVideo.originalFilename}
+          </h2>
+          <p class="text-sm text-gray-500">
+            {formatDate(selectedVideo.createdAt)}
+          </p>
+        </div>
+        <button
+          type="button"
+          onclick={closeVideoDetail}
+          class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors ml-4 cursor-pointer"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Content -->
+      <div class="flex-1 overflow-y-auto">
+        <!-- Video Player -->
+        <div class="aspect-video bg-black">
+          <video
+            src="{data.baseUrl}/v/{selectedVideo.id}"
+            class="w-full h-full"
+            controls
+            preload="metadata"
+          >
+            <track kind="captions" />
+          </video>
+        </div>
+
+        <!-- Video Info -->
+        <div class="p-6 space-y-6">
+          <!-- Quick Actions -->
+          <div class="flex gap-2">
+            <Button
+              variant="secondary"
+              onclick={() => copyToClipboard(`${data.baseUrl}/v/${selectedVideo.id}`, "Video URL copied")}
+              class="flex-1"
+            >
+              <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              Copy URL
+            </Button>
+            <Button
+              variant="danger"
+              onclick={() => deleteSingleVideo(selectedVideo.id)}
+            >
+              <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Delete
+            </Button>
+          </div>
+
+          <!-- Details -->
+          <div>
+            <h4 class="text-sm font-medium text-gray-900 mb-3">Details</h4>
+            <dl class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Dimensions</dt>
+                <dd class="text-gray-900 font-medium">{selectedVideo.width || '?'} × {selectedVideo.height || '?'}</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Duration</dt>
+                <dd class="text-gray-900 font-medium">{formatDuration(selectedVideo.duration)}</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Size</dt>
+                <dd class="text-gray-900 font-medium">{formatBytes(selectedVideo.sizeBytes)}</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Type</dt>
+                <dd class="text-gray-900 font-medium">{selectedVideo.mimeType}</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-gray-500">Status</dt>
+                <dd class="font-medium {selectedVideo.processingStatus === 'completed' ? 'text-emerald-600' : selectedVideo.processingStatus === 'failed' ? 'text-red-600' : 'text-amber-600'}">
+                  {selectedVideo.processingStatus}
+                </dd>
+              </div>
+            </dl>
+          </div>
+
+          <!-- CDN URL -->
+          <div>
+            <h4 class="text-sm font-medium text-gray-900 mb-2">CDN URL</h4>
+            <div class="flex gap-2">
+              <input
+                type="text"
+                readonly
+                value="{data.baseUrl}/v/{selectedVideo.id}"
+                class="flex-1 px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg text-gray-600"
+              />
+              <Button
+                variant="secondary"
+                onclick={() => copyToClipboard(`${data.baseUrl}/v/${selectedVideo.id}`, "URL copied")}
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
+
 <!-- Upload Modal -->
 {#if uploadOpen}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="fixed inset-0 z-50 flex items-center justify-center p-4"
-    onkeydown={(e) => e.key === "Escape" && !uploading && (uploadOpen = false)}
+    onkeydown={(e) => e.key === "Escape" && (uploadOpen = false)}
     role="presentation"
   >
     <!-- Backdrop with blur -->
     <button
       type="button"
       class="absolute inset-0 bg-gray-900/40 backdrop-blur-md transition-opacity"
-      onclick={() => !uploading && (uploadOpen = false)}
-      disabled={uploading}
+      onclick={() => (uploadOpen = false)}
       aria-label="Close"
     ></button>
 
@@ -1176,103 +1382,37 @@
             </svg>
           </div>
           <div>
-            <h2 class="text-lg font-semibold text-gray-900">Upload Images</h2>
+            <h2 class="text-lg font-semibold text-gray-900">Upload</h2>
             <p class="text-xs text-gray-500">Drag & drop or click to select</p>
           </div>
         </div>
-        {#if !uploading}
-          <button
-            type="button"
-            onclick={() => (uploadOpen = false)}
-            class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+        <button
+          type="button"
+          onclick={() => (uploadOpen = false)}
+          class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
+        >
+          <svg
+            class="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
           >
-            <svg
-              class="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        {/if}
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
       </div>
 
       <!-- Content -->
       <div class="p-6">
-        {#if uploading}
-          <!-- Upload Progress -->
-          <div class="space-y-4">
-            <div class="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
-              <div
-                class="w-12 h-12 rounded-xl bg-gray-900 flex items-center justify-center flex-shrink-0"
-              >
-                <svg
-                  class="w-5 h-5 text-white animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    class="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    stroke-width="3"
-                  ></circle>
-                  <path
-                    class="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center justify-between mb-1">
-                  <p class="text-sm font-medium text-gray-900">
-                    {uploadProgress.status === "processing"
-                      ? "Processing..."
-                      : "Uploading..."}
-                  </p>
-                  <span
-                    class="text-sm tabular-nums font-semibold text-gray-900"
-                  >
-                    {uploadProgress.current + 1} / {uploadProgress.total}
-                  </span>
-                </div>
-                <p class="text-xs text-gray-500 truncate mb-2">
-                  {uploadProgress.currentFile}
-                </p>
-                <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    class="h-full rounded-full transition-all duration-300 {uploadProgress.status ===
-                    'processing'
-                      ? 'bg-amber-500'
-                      : 'bg-gray-900'}"
-                    style="width: {((uploadProgress.current +
-                      (uploadProgress.status === 'processing' ? 0.5 : 0)) /
-                      uploadProgress.total) *
-                      100}%"
-                  ></div>
-                </div>
-              </div>
-            </div>
-            <p class="text-xs text-center text-gray-400">
-              Please wait while your images are being uploaded...
-            </p>
-          </div>
-        {:else}
-          <!-- Drag & Drop Zone -->
-          <Upload onfiles={handleFilesSelected} disabled={uploading} />
-          <p class="mt-3 text-xs text-center text-gray-400">
-            Supports PNG, JPG, WebP, GIF up to 50MB each
-          </p>
-        {/if}
+        <Upload onfiles={handleFilesSelected} accept="image/*,video/*" />
+        <p class="mt-3 text-xs text-center text-gray-400">
+          Images: PNG, JPG, WebP, GIF &bull; Videos: MP4, WebM, MOV, AVI, MKV
+        </p>
       </div>
     </div>
   </div>
