@@ -29,4 +29,16 @@ export const db = new Proxy({} as LibSQLDatabase<typeof schema>, {
 	}
 });
 
+export function closeDb(): void {
+	if (client) {
+		client.close();
+		client = null;
+		database = null;
+	}
+}
+
+export function resetDbConnection(): void {
+	closeDb();
+}
+
 export { schema };

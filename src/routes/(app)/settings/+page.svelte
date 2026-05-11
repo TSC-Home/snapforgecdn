@@ -1,7 +1,7 @@
 <script lang="ts">
   import { enhance } from "$app/forms";
   import { invalidateAll } from "$app/navigation";
-  import { Button, Card, Input, Select, toast } from "$lib/components/ui";
+  import { Button, Card, Input, Modal, Select, toast } from "$lib/components/ui";
 
   let { data, form } = $props();
 
@@ -28,6 +28,57 @@
 
   // SMTP form states
   let smtpEnabled = $state(data.settings?.smtp.enabled ?? false);
+
+  // Data management states
+  let showResetConfirm = $state(false);
+  let resetConfirmText = $state("");
+  let backupLoading = $state(false);
+  let restoreLoading = $state(false);
+  let restoreFile = $state<File | null>(null);
+  let restoreError = $state("");
+  const RESET_PHRASE = "DELETE EVERYTHING";
+
+  async function downloadBackup() {
+    backupLoading = true;
+    try {
+      const res = await fetch("/api/admin/backup");
+      if (!res.ok) throw new Error("Backup fehlgeschlagen");
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") ?? "";
+      const filename =
+        cd.match(/filename="([^"]+)"/)?.[1] ?? "snapforge-backup.zip";
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast("Backup heruntergeladen", "success");
+    } catch {
+      toast("Backup fehlgeschlagen", "error");
+    } finally {
+      backupLoading = false;
+    }
+  }
+
+  async function submitRestore() {
+    if (!restoreFile) return;
+    restoreLoading = true;
+    restoreError = "";
+    try {
+      const fd = new FormData();
+      fd.append("backup", restoreFile);
+      const res = await fetch("/api/admin/restore", {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Restore fehlgeschlagen");
+      window.location.href = "/login";
+    } catch (e) {
+      restoreError = e instanceof Error ? e.message : "Fehler beim Restore";
+      restoreLoading = false;
+    }
+  }
 
   $effect(() => {
     if (form?.success) {
@@ -774,9 +825,220 @@
           </div>
         </form>
       </Card>
+
+      <!-- Data Management Card -->
+      <Card>
+        {#snippet header()}
+          <div class="flex items-center gap-2">
+            <svg
+              class="w-4 h-4 text-gray-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
+              />
+            </svg>
+            Datenverwaltung
+          </div>
+        {/snippet}
+
+        <div class="space-y-6">
+          <!-- Backup erstellen -->
+          <div>
+            <h3 class="text-sm font-medium text-gray-900 mb-1">
+              Backup erstellen
+            </h3>
+            <p class="text-sm text-gray-500 mb-3">
+              Lädt eine ZIP-Datei herunter, die die Datenbank und alle
+              hochgeladenen Dateien enthält.
+            </p>
+            <Button
+              onclick={downloadBackup}
+              loading={backupLoading}
+              variant="secondary"
+            >
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+              Backup herunterladen
+            </Button>
+          </div>
+
+          <div class="border-t border-gray-100"></div>
+
+          <!-- Backup wiederherstellen -->
+          <div>
+            <h3 class="text-sm font-medium text-gray-900 mb-1">
+              Backup wiederherstellen
+            </h3>
+            <p class="text-sm text-gray-500 mb-3">
+              Lade eine zuvor erstellte Backup-ZIP hoch. Datenbank und alle
+              Uploads werden ersetzt. Du wirst danach ausgeloggt.
+            </p>
+            <div class="space-y-3">
+              <input
+                type="file"
+                accept=".zip"
+                onchange={(e) =>
+                  (restoreFile = e.currentTarget.files?.[0] ?? null)}
+                class="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-3 file:rounded-md file:border file:border-gray-200 file:text-sm file:font-medium file:bg-white file:text-gray-700 hover:file:bg-gray-50 cursor-pointer"
+              />
+              {#if restoreError}
+                <p class="text-sm text-red-600">{restoreError}</p>
+              {/if}
+              <Button
+                onclick={submitRestore}
+                loading={restoreLoading}
+                disabled={!restoreFile}
+                variant="secondary"
+              >
+                <svg
+                  class="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l4-4m0 0l4 4m-4-4v12"
+                  />
+                </svg>
+                Backup laden
+              </Button>
+            </div>
+          </div>
+
+          <div class="border-t border-gray-100"></div>
+
+          <!-- Danger Zone -->
+          <div class="p-4 bg-red-50 border border-red-100 rounded-lg space-y-3">
+            <div class="flex items-center gap-2">
+              <svg
+                class="w-4 h-4 text-red-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
+              <h3 class="text-sm font-medium text-red-900">Danger Zone</h3>
+            </div>
+            <p class="text-sm text-red-700">
+              Datenbank zurücksetzen — alle Nutzer, Galerien, Bilder, Videos
+              und Einstellungen werden permanent gelöscht. Upload-Dateien auf
+              der Festplatte bleiben erhalten. Du wirst sofort ausgeloggt.
+            </p>
+            <Button
+              variant="danger"
+              size="sm"
+              onclick={() => (showResetConfirm = true)}
+            >
+              Datenbank zurücksetzen
+            </Button>
+          </div>
+        </div>
+      </Card>
     </div>
   {/if}
 </div>
+
+<!-- Reset Confirmation Modal -->
+<Modal bind:open={showResetConfirm} title="Datenbank wirklich zurücksetzen?">
+  {#snippet children()}
+    <div class="space-y-4">
+      <div
+        class="flex items-start gap-3 p-3 bg-red-50 border border-red-100 rounded-lg"
+      >
+        <svg
+          class="w-5 h-5 text-red-500 shrink-0 mt-0.5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+          />
+        </svg>
+        <p class="text-sm text-red-800">
+          Diese Aktion löscht alle Daten unwiderruflich: Nutzer, Galerien,
+          Bilder, Videos und Einstellungen. Sie kann nicht rückgängig gemacht
+          werden.
+        </p>
+      </div>
+      <div>
+        <label for="reset-confirm" class="block text-sm font-medium text-gray-700 mb-1">
+          Gib <span class="font-mono font-bold text-red-700"
+            >DELETE EVERYTHING</span
+          > ein um zu bestätigen:
+        </label>
+        <input
+          id="reset-confirm"
+          type="text"
+          bind:value={resetConfirmText}
+          placeholder="DELETE EVERYTHING"
+          autocomplete="off"
+          class="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+        />
+      </div>
+    </div>
+  {/snippet}
+  {#snippet footer()}
+    <Button
+      variant="secondary"
+      onclick={() => {
+        showResetConfirm = false;
+        resetConfirmText = "";
+      }}
+    >
+      Abbrechen
+    </Button>
+    <form
+      method="POST"
+      action="?/resetDatabase"
+      use:enhance={() => {
+        return async ({ result }) => {
+          if (result.type !== "redirect") {
+            showResetConfirm = false;
+            resetConfirmText = "";
+          }
+        };
+      }}
+    >
+      <Button
+        type="submit"
+        variant="danger"
+        disabled={resetConfirmText !== RESET_PHRASE}
+      >
+        Zurücksetzen
+      </Button>
+    </form>
+  {/snippet}
+</Modal>
 
 <style>
   @keyframes fade-in {

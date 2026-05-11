@@ -13,7 +13,7 @@ const config = {
     }),
     csrf: {
       // Disable origin check when behind reverse proxy (Coolify/Caddy)
-      checkOrigin: false,
+      trustedOrigins: ["localhost", "127.0.0.1"],
     },
   },
   vitePlugin: {

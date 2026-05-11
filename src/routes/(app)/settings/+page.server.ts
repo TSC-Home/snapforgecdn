@@ -1,5 +1,5 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { db, schema } from '$lib/server/db';
 import { eq } from 'drizzle-orm';
 import { hashPassword, verifyPassword } from '$lib/server/services/password';
@@ -203,6 +203,23 @@ export const actions: Actions = {
 		});
 
 		return { success: true, action: 'smtp' };
+	},
+
+	resetDatabase: async ({ locals, cookies }) => {
+		if (locals.user?.role !== 'admin') {
+			return fail(403, { error: 'Nur Admins dürfen die Datenbank zurücksetzen', action: 'resetDatabase' });
+		}
+		try {
+			const { resetDatabase } = await import('$lib/server/services/backup');
+			await resetDatabase();
+			cookies.delete('session', { path: '/' });
+			throw redirect(302, '/login');
+		} catch (err) {
+			const e = err as { status?: number };
+			if (e?.status === 302) throw err;
+			console.error('DB reset failed:', err);
+			return fail(500, { error: 'Datenbank-Reset fehlgeschlagen', action: 'resetDatabase' });
+		}
 	},
 
 	testSmtp: async ({ request, locals }) => {
