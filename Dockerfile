@@ -12,8 +12,9 @@ WORKDIR /app
 # Copy package files
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies (skip scripts; rebuild native modules explicitly below)
+RUN pnpm install --frozen-lockfile --ignore-scripts
+RUN pnpm rebuild better-sqlite3 sharp
 
 # Copy source code
 COPY . .
