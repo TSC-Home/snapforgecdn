@@ -23,7 +23,7 @@ COPY . .
 RUN pnpm build
 
 # Prune dev dependencies
-RUN pnpm prune --prod
+RUN pnpm prune --prod --ignore-scripts
 
 # Production stage
 FROM node:22-alpine AS production
